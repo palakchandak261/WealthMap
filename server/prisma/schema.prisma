@@ -1,0 +1,317 @@
+// ============================================================================
+// WealthMap — Database Schema
+// Owner: Database module
+// Maps 1:1 to the tables listed in README.md → "Database Schema (Summary)"
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// ENUMS
+// ----------------------------------------------------------------------------
+
+enum Frequency {
+  ONE_TIME
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum ObligationType {
+  EMI
+  RENT
+  BILL
+  SUBSCRIPTION
+  INSURANCE
+  LOAN
+  OTHER
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  ABANDONED
+}
+
+enum PredictionType {
+  EXPENSE_FORECAST
+  CATEGORY_FORECAST
+  CASH_FLOW_PROJECTION
+  RISK_DATE
+}
+
+enum RiskLevel {
+  LOW // 0-30
+  MODERATE // 31-60
+  HIGH // 61-80
+  CRITICAL // 81-100
+}
+
+enum GraphNodeType {
+  INCOME
+  CASH
+  BUDGET
+  EXPENSES
+  SAVINGS
+  BUFFER
+  EMI
+  RENT
+  DEBT
+  GOALS
+  RISK
+}
+
+enum GraphSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ----------------------------------------------------------------------------
+// 1. USERS — Auth + financial profile
+// ----------------------------------------------------------------------------
+
+model User {
+  id                 String   @id @default(uuid())
+  name               String
+  email              String   @unique
+  passwordHash       String
+  currency           String   @default("INR")
+  cashBalance        Decimal  @default(0) @db.Decimal(14, 2)
+  savingsBalance     Decimal  @default(0) @db.Decimal(14, 2)
+  onboardingComplete Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  incomes         Income[]
+  expenses        Expense[]
+  budgets         Budget[]
+  obligations     Obligation[]
+  goals           Goal[]
+  predictions     Prediction[]
+  riskLogs        RiskLog[]
+  graphNodes      GraphNode[]
+
+  @@map("users")
+}
+
+// ----------------------------------------------------------------------------
+// 2. INCOMES — Income sources
+// ----------------------------------------------------------------------------
+
+model Income {
+  id          String    @id @default(uuid())
+  userId      String
+  source      String
+  amount      Decimal   @db.Decimal(14, 2)
+  frequency   Frequency @default(MONTHLY)
+  isRecurring Boolean   @default(true)
+  receivedAt  DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, receivedAt])
+  @@map("incomes")
+}
+
+// ----------------------------------------------------------------------------
+// 3. EXPENSES — All transactions
+// ----------------------------------------------------------------------------
+
+model Expense {
+  id          String   @id @default(uuid())
+  userId      String
+  category    String
+  amount      Decimal  @db.Decimal(14, 2)
+  description String?
+  spentAt     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, spentAt])
+  @@index([userId, category])
+  @@map("expenses")
+}
+
+// ----------------------------------------------------------------------------
+// 4. BUDGETS — Monthly budget
+// ----------------------------------------------------------------------------
+
+model Budget {
+  id          String   @id @default(uuid())
+  userId      String
+  month       Int // 1-12
+  year        Int
+  totalBudget Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryBudgets CategoryBudget[]
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@map("budgets")
+}
+
+// ----------------------------------------------------------------------------
+// 5. CATEGORY_BUDGETS — Per-category limits
+// ----------------------------------------------------------------------------
+
+model CategoryBudget {
+  id        String   @id @default(uuid())
+  budgetId  String
+  category  String
+  limit     Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetId, category])
+  @@index([budgetId])
+  @@map("category_budgets")
+}
+
+// ----------------------------------------------------------------------------
+// 6. OBLIGATIONS — EMIs, rent, bills
+// ----------------------------------------------------------------------------
+
+model Obligation {
+  id          String         @id @default(uuid())
+  userId      String
+  name        String
+  type        ObligationType
+  amount      Decimal        @db.Decimal(14, 2)
+  dueDate     DateTime
+  frequency   Frequency      @default(MONTHLY)
+  isRecurring Boolean        @default(true)
+  isPaid      Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, dueDate])
+  @@map("obligations")
+}
+
+// ----------------------------------------------------------------------------
+// 7. GOALS — Savings goals
+// ----------------------------------------------------------------------------
+
+model Goal {
+  id            String     @id @default(uuid())
+  userId        String
+  name          String
+  targetAmount  Decimal    @db.Decimal(14, 2)
+  currentAmount Decimal    @default(0) @db.Decimal(14, 2)
+  deadline      DateTime?
+  status        GoalStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("goals")
+}
+
+// ----------------------------------------------------------------------------
+// 8. PREDICTIONS — Stored forecast results
+// ----------------------------------------------------------------------------
+
+model Prediction {
+  id          String         @id @default(uuid())
+  userId      String
+  type        PredictionType
+  resultJson  Json // e.g. { projectedExpense, categoryBreakdown, confidence }
+  generatedAt DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, type])
+  @@map("predictions")
+}
+
+// ----------------------------------------------------------------------------
+// 9. RISK_LOGS — Risk score history
+// ----------------------------------------------------------------------------
+
+model RiskLog {
+  id             String    @id @default(uuid())
+  userId         String
+  riskScore      Int // 0-100, normalized
+  riskLevel      RiskLevel
+  budgetRisk     Int // 0-100 component score
+  cashFlowRisk   Int
+  obligationRisk Int
+  velocityRisk   Int
+  goalRisk       Int
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("risk_logs")
+}
+
+// ----------------------------------------------------------------------------
+// 10. GRAPH_NODES / GRAPH_EDGES — Financial Dependency Graph (React Flow)
+// ----------------------------------------------------------------------------
+
+model GraphNode {
+  id        String        @id @default(uuid())
+  userId    String
+  type      GraphNodeType
+  label     String
+  value     Decimal?      @db.Decimal(14, 2)
+  positionX Float         @default(0)
+  positionY Float         @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outboundEdges GraphEdge[] @relation("SourceNode")
+  inboundEdges  GraphEdge[] @relation("TargetNode")
+
+  @@index([userId])
+  @@map("graph_nodes")
+}
+
+model GraphEdge {
+  id           String        @id @default(uuid())
+  sourceNodeId String
+  targetNodeId String
+  relationship String // e.g. "funds", "deposits_into", "reduces"
+  weight       Float         @default(1.0)
+  severity     GraphSeverity @default(MEDIUM)
+  createdAt    DateTime      @default(now())
+
+  sourceNode GraphNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode GraphNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+  @@map("graph_edges")
+}
