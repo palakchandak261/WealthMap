@@ -2,99 +2,6 @@
 
 > **WealthMap: A Proactive Personal Financial Decision-Support and Risk Prediction System**
 
-WealthMap doesn't just track where your money went — it models your complete financial state, predicts what's likely to happen, simulates hypothetical decisions, and helps you act before problems occur.
-
----
-
-## 🎯 Core Philosophy
-
-```
-USER DATA → FINANCIAL STATE ENGINE → PREDICTION → RISK ENGINE
-         → DEPENDENCY GRAPH → WHAT-IF SIMULATION → RECOMMENDATIONS
-```
-
-**The 3 pillars:**
-- 🔮 **PREDICT** — What is likely to happen to your finances?
-- 🧪 **SIMULATE** — What happens if you make this purchase?
-- 🛡️ **PREVENT** — What can you do before the problem occurs?
-
----
-
-## 🏗️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + TypeScript + Tailwind CSS |
-| Charts | Recharts |
-| Graph Visualization | React Flow |
-| Backend | Node.js + Express.js + TypeScript |
-| Database | MySQL + Prisma ORM |
-| AI Layer | LLM API (OpenAI / Gemini) |
-| Auth | JWT |
-
----
-
-## 📁 Project Structure
-
-```
-WealthMap/
-├── client/                  # React frontend
-│   ├── public/
-│   └── src/
-│       ├── components/      # Reusable UI components
-│       ├── pages/           # Route-level pages
-│       ├── hooks/           # Custom React hooks
-│       ├── services/        # API call functions
-│       ├── store/           # State management (Context/Zustand)
-│       ├── types/           # TypeScript interfaces
-│       └── utils/           # Helper functions
-│
-├── server/                  # Express backend
-│   └── src/
-│       ├── modules/         # Feature modules
-│       │   ├── auth/
-│       │   ├── users/
-│       │   ├── income/
-│       │   ├── expenses/
-│       │   ├── budgets/
-│       │   ├── obligations/
-│       │   ├── goals/
-│       │   ├── engines/
-│       │   │   ├── financial-state/
-│       │   │   ├── forecasting/
-│       │   │   ├── risk/
-│       │   │   ├── dependency/
-│       │   │   ├── simulation/
-│       │   │   └── health-score/
-│       │   └── ai/
-│       ├── prisma/          # DB schema + migrations
-│       ├── middleware/
-│       └── utils/
-│
-├── docs/                    # Architecture docs, API specs
-├── .github/                 # PR templates, issue templates
-└── README.md
-```
-
----
-
-## 🧩 10 Modules Overview
-
-| # | Module | Description |
-|---|--------|-------------|
-| 1 | User & Financial Profile | Auth, onboarding, financial snapshot |
-| 2 | Income & Expense Management | Transaction CRUD, day-wise timeline |
-| 3 | Budget Engine | Category budgets, utilization tracking |
-| 4 | Financial State Engine | Real-time financial snapshot (Digital Twin) |
-| 5 | Prediction & Forecasting | Weighted multi-signal expense projection |
-| 6 | Risk & Alert Engine | Budget/cash-flow/obligation risk scoring |
-| 7 | Financial Dependency Graph | Cascading impact via weighted directed graph |
-| 8 | What-If Simulator | Hypothetical scenario simulation |
-| 9 | Financial Health & Goals | Health score (0–100), goal tracking |
-| 10 | AI Recommendation Engine | LLM-powered natural language insights |
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -128,23 +35,7 @@ npm run dev                 # starts on http://localhost:5173
 
 ---
 
-## 🗄️ Database Schema (Summary)
 
-| Table | Purpose |
-|-------|---------|
-| `users` | Auth + financial profile |
-| `incomes` | Income sources |
-| `expenses` | All transactions |
-| `budgets` | Monthly budget |
-| `category_budgets` | Per-category limits |
-| `obligations` | EMIs, rent, bills |
-| `goals` | Savings goals |
-| `predictions` | Stored forecast results |
-| `risk_logs` | Risk score history |
-| `graph_nodes` | Dependency graph nodes |
-| `graph_edges` | Dependency graph edges |
-
----
 
 ## 🧮 Core Algorithms
 
@@ -1514,7 +1405,7 @@ The dataset should match the actual WealthMap database schema.
 
 # 👥 Team Responsibilities
 
-## Member 1 — Database — 25%
+## Member 1 — Database —
 
 Responsible for:
 
@@ -1534,7 +1425,7 @@ Responsible for:
 
 ---
 
-## Member 2 — Backend + Intelligence — 45%
+## Member 2 — Backend + Intelligence 
 
 Responsible for:
 
@@ -1564,7 +1455,7 @@ Responsible for:
 
 ---
 
-## Member 3 — Frontend — 30%
+## Member 3 — Frontend —
 
 Responsible for:
 
