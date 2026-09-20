@@ -83,16 +83,18 @@ enum GraphSeverity {
 // ----------------------------------------------------------------------------
 
 model User {
-  id                 String   @id @default(uuid())
-  name               String
-  email              String   @unique
-  passwordHash       String
-  currency           String   @default("INR")
-  cashBalance        Decimal  @default(0) @db.Decimal(14, 2)
-  savingsBalance     Decimal  @default(0) @db.Decimal(14, 2)
-  onboardingComplete Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String   @unique
+  passwordHash         String
+  currency             String   @default("INR")
+  cashBalance          Decimal  @default(0) @db.Decimal(14, 2)
+  savingsBalance       Decimal  @default(0) @db.Decimal(14, 2)
+  emergencyFundBalance Decimal  @default(0) @db.Decimal(14, 2)
+  declaredMonthlyIncome Decimal @default(0) @db.Decimal(14, 2)
+  onboardingComplete   Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   incomes         Income[]
   expenses        Expense[]
@@ -132,21 +134,32 @@ model Income {
 // 3. EXPENSES — All transactions
 // ----------------------------------------------------------------------------
 
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  NET_BANKING
+  OTHER
+}
+
 model Expense {
-  id          String   @id @default(uuid())
-  userId      String
-  category    String
-  amount      Decimal  @db.Decimal(14, 2)
-  description String?
-  spentAt     DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String        @id @default(uuid())
+  userId        String
+  category      String
+  amount        Decimal       @db.Decimal(14, 2)
+  description   String?
+  paymentMethod PaymentMethod @default(OTHER)
+  isRecurring   Boolean       @default(false)
+  spentAt       DateTime
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, spentAt])
   @@index([userId, category])
+  @@index([userId, isRecurring])
   @@map("expenses")
 }
 

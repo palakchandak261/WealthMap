@@ -35,9 +35,9 @@ erDiagram
 
 | Table | Key design decisions |
 |---|---|
-| `users` | `cashBalance` / `savingsBalance` live here as the running totals the Financial State Engine reads first. `currency` defaults to `INR` — change if you need multi-currency. |
+| `users` | `cashBalance` / `savingsBalance` / `emergencyFundBalance` live here as the running totals the Financial State Engine reads first. `declaredMonthlyIncome` stores the user's self-reported income for quick access without summing all income rows. `currency` defaults to `INR`. |
 | `incomes` | `frequency` enum drives the forecasting engine's recurrence math. |
-| `expenses` | Indexed on `(userId, spentAt)` and `(userId, category)` — these are the two access patterns the forecasting and anomaly-detection engines need. |
+| `expenses` | `paymentMethod` enum and `isRecurring` boolean added for recurring-expense detection and anomaly analysis. Indexed on `(userId, spentAt)`, `(userId, category)`, and `(userId, isRecurring)` — the three access patterns the forecasting, anomaly-detection, and subscription engines need. |
 | `budgets` | One row per user per `(month, year)` — enforced by a unique constraint, so "upsert this month's budget" is a single safe query. |
 | `category_budgets` | Child of `budgets`; unique on `(budgetId, category)` so a category can't be double-defined in the same month. |
 | `obligations` | `dueDate` + `frequency` + `isRecurring` together are enough for the risk engine to project the next N occurrences without a separate recurrence table. |
@@ -105,6 +105,7 @@ And make sure these are in `devDependencies`: `prisma`, `ts-node`, `typescript`,
 - `Decimal` fields come back from Prisma as `Decimal.js` objects, not plain JS numbers — the AI layer's "build a financial context summary string" step should call `.toString()` or `.toNumber()` explicitly before templating them into the LLM prompt.
 - No `sessions`/`refresh_tokens` table is included — the README only specifies JWT auth, which is stateless by default. Add one if you introduce refresh-token rotation.
 - Multi-currency is not implemented beyond the single `currency` field on `users` — all amounts across every table are assumed to be in that one currency.
+- The seed password hash is for `Demo@1234` (bcrypt rounds 12). Use this only for local dev testing — never deploy seed data to production.
 
 ---
 

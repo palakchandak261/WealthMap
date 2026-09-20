@@ -6,7 +6,7 @@
  *
  * Run with: npx prisma db seed
  */
-import { PrismaClient, Frequency, ObligationType, GoalStatus, GraphNodeType, GraphSeverity } from '@prisma/client';
+import { PrismaClient, Frequency, ObligationType, GoalStatus, GraphNodeType, GraphSeverity, PaymentMethod } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -28,10 +28,13 @@ async function main() {
     data: {
       name: 'Demo User',
       email: 'demo@wealthmap.app',
-      passwordHash: '$2b$10$replace.with.a.real.bcrypt.hash........................',
+      // bcrypt hash of "Demo@1234" — replace before real auth testing
+      passwordHash: '$2b$12$KIXjH0n/V4V.yRZ8PQGIKeO0aTCMXSEXzRvMq3XcRAn4L5BW5Ky9S',
       currency: 'INR',
       cashBalance: '85000.00',
       savingsBalance: '150000.00',
+      emergencyFundBalance: '50000.00',
+      declaredMonthlyIncome: '75000.00',
       onboardingComplete: true,
     },
   });
@@ -69,12 +72,13 @@ async function main() {
 
   await prisma.expense.createMany({
     data: [
-      { userId: user.id, category: 'Groceries', amount: '2200.00', description: 'Weekly groceries', spentAt: new Date('2026-09-02') },
-      { userId: user.id, category: 'Dining', amount: '1500.00', description: 'Dinner out', spentAt: new Date('2026-09-05') },
-      { userId: user.id, category: 'Transport', amount: '900.00', description: 'Cab rides', spentAt: new Date('2026-09-06') },
-      { userId: user.id, category: 'Entertainment', amount: '2500.00', description: 'Concert tickets', spentAt: new Date('2026-09-10') },
-      { userId: user.id, category: 'Groceries', amount: '2100.00', description: 'Weekly groceries', spentAt: new Date('2026-09-12') },
-      { userId: user.id, category: 'Utilities', amount: '3200.00', description: 'Electricity + water', spentAt: new Date('2026-09-14') },
+      { userId: user.id, category: 'Groceries', amount: '2200.00', description: 'Weekly groceries', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date('2026-09-02') },
+      { userId: user.id, category: 'Dining', amount: '1500.00', description: 'Dinner out', paymentMethod: PaymentMethod.CARD, isRecurring: false, spentAt: new Date('2026-09-05') },
+      { userId: user.id, category: 'Transport', amount: '900.00', description: 'Cab rides', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date('2026-09-06') },
+      { userId: user.id, category: 'Entertainment', amount: '2500.00', description: 'Concert tickets', paymentMethod: PaymentMethod.CARD, isRecurring: false, spentAt: new Date('2026-09-10') },
+      { userId: user.id, category: 'Groceries', amount: '2100.00', description: 'Weekly groceries', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date('2026-09-12') },
+      { userId: user.id, category: 'Utilities', amount: '3200.00', description: 'Electricity + water', paymentMethod: PaymentMethod.NET_BANKING, isRecurring: true, spentAt: new Date('2026-09-14') },
+      { userId: user.id, category: 'Entertainment', amount: '299.00', description: 'Streaming subscription', paymentMethod: PaymentMethod.CARD, isRecurring: true, spentAt: new Date('2026-09-01') },
     ],
   });
 
