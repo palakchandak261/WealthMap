@@ -1,0 +1,109 @@
+/* Simulation Page */
+.sim-page {}
+
+.sim-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.sim-input-card {
+  padding: 1.75rem;
+  position: sticky;
+  top: 1rem;
+}
+
+/* How it works */
+.sim-how-card {
+  margin-top: 1.5rem;
+  background: var(--bg-base);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--neu-inset);
+}
+.sim-how-list {
+  list-style: decimal;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.9;
+}
+
+/* Placeholder */
+.sim-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--neu-raised);
+}
+.sim-placeholder-icon {
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  background: var(--primary-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--neu-raised-sm);
+  margin-bottom: 0.5rem;
+}
+
+/* Results */
+.sim-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.sim-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.sim-metric-card {
+  padding: 1.25rem;
+}
+.sim-metric-icon {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--neu-raised-sm);
+}
+.sim-metric-card h4 {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+.sim-compare-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.sim-val-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+}
+.sim-arrow {
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.sim-impact-card {
+  padding: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .sim-layout { grid-template-columns: 1fr; }
+  .sim-input-card { position: static; }
+  .sim-compare-grid { grid-template-columns: 1fr; }
+}

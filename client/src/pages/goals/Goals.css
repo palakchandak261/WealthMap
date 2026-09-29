@@ -1,0 +1,28 @@
+/* Goals Page */
+.goals-summary-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.goals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.goal-card {
+  padding: 1.25rem;
+  transition: transform var(--transition);
+}
+.goal-card:hover { transform: translateY(-2px); }
+.goal-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.goal-amounts {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+}

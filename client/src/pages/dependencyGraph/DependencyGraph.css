@@ -1,0 +1,73 @@
+/* Dependency Graph Page */
+.graph-page {}
+
+.graph-legend {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.graph-legend-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.legend-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+}
+
+.graph-container {
+  height: 580px;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  margin-bottom: 1rem;
+}
+
+.graph-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.graph-empty {
+  height: 400px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--neu-raised);
+}
+
+.graph-stats {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.graph-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Override React Flow styles */
+.react-flow__attribution { display: none; }
+.react-flow__panel.react-flow__controls button {
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-subtle);
+  color: var(--text-secondary);
+}
+.react-flow__panel.react-flow__controls button:hover {
+  background: var(--primary-100);
+  color: var(--primary-700);
+}

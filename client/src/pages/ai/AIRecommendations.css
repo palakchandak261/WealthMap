@@ -1,0 +1,185 @@
+/* AI Recommendations Page */
+.ai-page {}
+
+.ai-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ai-input-card {
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ai-brain-icon {
+  width: 48px; height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--primary-100);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--neu-raised-sm);
+  flex-shrink: 0;
+}
+
+.ai-input-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.ai-input-row input {
+  flex: 1;
+}
+
+.ai-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--primary-100);
+  color: var(--primary-700);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all var(--transition);
+  box-shadow: var(--neu-raised-sm);
+}
+.ai-chip:hover:not(:disabled) {
+  background: var(--primary-500);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.ai-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Loading */
+.ai-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 1rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--neu-raised);
+}
+.ai-loading-inner {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--primary-300);
+  animation: aiPulse 1.5s ease infinite;
+}
+@keyframes aiPulse {
+  0%   { transform: scale(0.85); opacity: 1; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
+/* Results */
+.ai-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.ai-summary-card { padding: 1.5rem; }
+.ai-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+.ai-recs-card, .ai-actions-card { padding: 1.5rem; }
+
+/* Recommendation Items */
+.ai-recs-list { display: flex; flex-direction: column; gap: 0.85rem; }
+.ai-rec-item {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.85rem;
+  background: var(--bg-base);
+  border-radius: var(--radius-md);
+  box-shadow: var(--neu-inset);
+}
+.ai-rec-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--primary-500);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Action Items */
+.ai-actions-list { display: flex; flex-direction: column; gap: 0.85rem; }
+.ai-action-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem;
+  background: var(--warning-light);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--warning);
+}
+
+/* Disclaimer */
+.ai-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 0.75rem 1rem;
+  background: var(--bg-base);
+  border-radius: var(--radius-md);
+}
+
+/* Empty state */
+.ai-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--neu-raised);
+}
+.ai-empty-icon {
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  background: var(--primary-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--neu-raised-sm);
+  margin-bottom: 0.25rem;
+}
+
+@media (max-width: 768px) {
+  .ai-two-col { grid-template-columns: 1fr; }
+  .ai-input-row { flex-direction: column; align-items: stretch; }
+}
