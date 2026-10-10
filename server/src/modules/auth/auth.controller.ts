@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import {
   registerService, loginService, getMeService,
   verifyEmailService, forgotPasswordService, resetPasswordService,
+  sendOtpService, verifyOtpService,
 } from "./auth.service";
 import { AuthRequest } from "../../middleware/authenticate";
 import { ok } from "../../lib/response";
@@ -33,5 +34,15 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try { ok(res, await resetPasswordService(req.body.token, req.body.password)); }
+  catch (err) { next(err); }
+};
+
+export const sendOtp = async (req: Request, res: Response, next: NextFunction) => {
+  try { ok(res, await sendOtpService(req.body)); }
+  catch (err) { next(err); }
+};
+
+export const verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
+  try { ok(res, await verifyOtpService(req.body)); }
   catch (err) { next(err); }
 };

@@ -11,6 +11,7 @@ const RegisterPage      = lazy(() => import('./pages/auth/RegisterPage'));
 const ForgotPasswordPage= lazy(() => import('./pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const VerifyEmailPage   = lazy(() => import('./pages/auth/VerifyEmailPage'));
+const OtpVerifyPage     = lazy(() => import('./pages/auth/OtpVerifyPage'));
 const OnboardingPage    = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const DashboardPage     = lazy(() => import('./pages/dashboard/DashboardPage'));
 const IncomePage        = lazy(() => import('./pages/income/IncomePage'));
@@ -77,6 +78,7 @@ const AppRouter: React.FC = () => (
       <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
       <Route path="/reset-password"  element={<ResetPasswordPage />} />
       <Route path="/verify-email"    element={<VerifyEmailPage />} />
+      <Route path="/verify-otp"      element={<Suspense fallback={<PageLoader />}><OtpVerifyPage /></Suspense>} />
 
       {/* ── Onboarding (protected, after first register) ── */}
       <Route path="/onboarding" element={<ProtectedRoute onboarding><Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense></ProtectedRoute>} />

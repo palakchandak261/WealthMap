@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 
 const createTransport = () => {
-  // If no SMTP config, use Ethereal (dev fake SMTP — emails logged to console)
   if (!process.env.SMTP_HOST) {
     return nodemailer.createTransport({
       host: "smtp.ethereal.email",
@@ -12,7 +11,6 @@ const createTransport = () => {
       },
     });
   }
-
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT ?? 587),
@@ -48,7 +46,6 @@ export const sendVerificationEmail = async (email: string, name: string, token: 
     `,
   });
 
-  // In dev without real SMTP, log the preview URL
   if (!process.env.SMTP_HOST) {
     console.log(`[Mailer] Verification email preview: ${nodemailer.getTestMessageUrl(info)}`);
   }
@@ -77,5 +74,34 @@ export const sendPasswordResetEmail = async (email: string, name: string, token:
 
   if (!process.env.SMTP_HOST) {
     console.log(`[Mailer] Password reset email preview: ${nodemailer.getTestMessageUrl(info)}`);
+  }
+};
+
+// ── Send OTP email ────────────────────────────────────────────────────────────
+export const sendOtpEmail = async (email: string, name: string, otp: string) => {
+  const transporter = createTransport();
+
+  const info = await transporter.sendMail({
+    from: FROM,
+    to: email,
+    subject: `${otp} is your WealthMap OTP`,
+    html: `
+      <div style="font-family:Inter,sans-serif;max-width:480px;margin:auto;padding:2rem;background:#F5F8F7;border-radius:16px;border:1px solid #C5E9D9;">
+        <h2 style="color:#182923">Hi ${name} 👋</h2>
+        <p style="color:#53675F">Use the OTP below to complete your login. It expires in <strong>10 minutes</strong>.</p>
+        <div style="margin:1.5rem 0;text-align:center;">
+          <span style="display:inline-block;letter-spacing:0.5rem;font-size:2.5rem;font-weight:800;color:#218565;background:#E7F5EF;padding:1rem 2rem;border-radius:12px;border:2px solid #8BD0B2;">
+            ${otp}
+          </span>
+        </div>
+        <p style="color:#82928B;font-size:0.8rem;">This OTP expires in 10 minutes. If you didn't request this, please ignore this email.</p>
+        <p style="color:#82928B;font-size:0.8rem;">Never share this OTP with anyone.</p>
+      </div>
+    `,
+  });
+
+  if (!process.env.SMTP_HOST) {
+    console.log(`[Mailer] OTP email preview: ${nodemailer.getTestMessageUrl(info)}`);
+    console.log(`[Mailer] 🔑 OTP for ${email}: ${otp}`);
   }
 };

@@ -431,3 +431,64 @@
     margin: 0 auto;
   }
 }
+
+/* ── OTP Input Boxes ─────────────────────────────────────────────────────────── */
+.otp-input-row {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.otp-box {
+  width: 52px;
+  height: 60px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--bg-subtle);
+  background: var(--bg-base);
+  box-shadow: var(--neu-inset);
+  color: var(--text-primary);
+  transition: all var(--transition);
+  font-family: 'Inter', sans-serif;
+  caret-color: var(--primary-500);
+}
+
+.otp-box:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px rgba(33, 133, 101, 0.15);
+  background: var(--bg-surface);
+}
+
+.otp-box-filled {
+  border-color: var(--primary-400, var(--primary-500));
+  background: var(--primary-100);
+  color: var(--primary-700);
+}
+
+/* ── CAPTCHA wrapper ──────────────────────────────────────────────────────────── */
+.captcha-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 0.25rem 0;
+}
+.captcha-wrapper > div {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* ── btn-ghost ────────────────────────────────────────────────────────────────── */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--bg-subtle);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+.btn-ghost:hover {
+  background: var(--bg-base);
+  color: var(--text-secondary);
+}
+

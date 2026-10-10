@@ -12,6 +12,7 @@ interface AuthContextValue {
   register: (name: string, email: string, password: string, confirmPassword?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  setAuthData: (token: string, user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -62,11 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (name: string, email: string, password: string, confirmPassword?: string) => {
     const { data } = await api.post('/auth/register', { name, email, password, confirmPassword: confirmPassword ?? password });
     if (!data.success) throw new Error(data.error?.message ?? 'Registration failed');
-    const { token: newToken, user: newUser } = data.data;
-    localStorage.setItem('wm_token', newToken);
-    localStorage.setItem('wm_user', JSON.stringify(newUser));
-    setToken(newToken);
-    setUser(newUser);
+    // Token is no longer returned here because user must verify OTP first
   };
 
   const logout = useCallback(() => {
@@ -77,6 +74,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = '/login';
   }, []);
 
+  const setAuthData = useCallback((newToken: string, newUser: User) => {
+    localStorage.setItem('wm_token', newToken);
+    localStorage.setItem('wm_user', JSON.stringify(newUser));
+    setToken(newToken);
+    setUser(newUser);
+  }, []);
+
   const refreshUser = useCallback(async () => {
     await fetchCurrentUser();
   }, []);
@@ -85,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider value={{
       user, token, isLoading,
       isAuthenticated: !!token && !!user,
-      login, register, logout, refreshUser,
+      login, register, logout, refreshUser, setAuthData
     }}>
       {children}
     </AuthContext.Provider>

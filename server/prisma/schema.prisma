@@ -98,6 +98,10 @@ model User {
   verifyTokenExpiry    DateTime?
   resetToken           String?
   resetTokenExpiry     DateTime?
+  // OTP fields
+  otpCode              String?
+  otpExpiry            DateTime?
+  otpVerified          Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

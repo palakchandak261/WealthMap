@@ -55,5 +55,24 @@ export const ResetPasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export type RegisterInput = z.infer<typeof RegisterSchema>;
-export type LoginInput = z.infer<typeof LoginSchema>;
+// ── OTP ───────────────────────────────────────────────────────────────────────
+export const SendOtpSchema = z.object({
+  email: z
+    .string({ required_error: "Email is required" })
+    .email("Please enter a valid email address"),
+});
+
+export const VerifyOtpSchema = z.object({
+  email: z
+    .string({ required_error: "Email is required" })
+    .email("Please enter a valid email address"),
+  otp: z
+    .string({ required_error: "OTP is required" })
+    .length(6, "OTP must be exactly 6 digits")
+    .regex(/^\d{6}$/, "OTP must contain only digits"),
+});
+
+export type RegisterInput  = z.infer<typeof RegisterSchema>;
+export type LoginInput     = z.infer<typeof LoginSchema>;
+export type SendOtpInput   = z.infer<typeof SendOtpSchema>;
+export type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;

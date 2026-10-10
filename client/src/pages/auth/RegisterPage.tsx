@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 import './Auth.css';
 
+const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+
 const RegisterPage: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const captchaRef = useRef<ReCAPTCHA>(null);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -16,6 +20,7 @@ const RegisterPage: React.FC = () => {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const passwordStrength = (pw: string): { strength: number; label: string; color: string } => {
     let s = 0;
@@ -36,12 +41,15 @@ const RegisterPage: React.FC = () => {
     if (!name || !email || !password || !confirmPw) { setError('All fields are required.'); return; }
     if (password !== confirmPw) { setError('Passwords do not match.'); return; }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (!captchaToken) { setError('Please complete the CAPTCHA verification.'); return; }
     setLoading(true);
     try {
       await register(name, email, password);
-      navigate('/onboarding');
+      navigate('/verify-otp', { state: { email } });
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Registration failed. Please try again.'));
+      captchaRef.current?.reset();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -173,11 +181,21 @@ const RegisterPage: React.FC = () => {
               </div>
             </div>
 
+            {/* CAPTCHA */}
+            <div className="captcha-wrapper">
+              <ReCAPTCHA
+                ref={captchaRef}
+                sitekey={RECAPTCHA_SITE_KEY}
+                onChange={(token) => setCaptchaToken(token)}
+                onExpired={() => setCaptchaToken(null)}
+              />
+            </div>
+
             <button
               id="btn-register"
               type="submit"
               className="btn btn-primary btn-lg btn-full"
-              disabled={loading}
+              disabled={loading || !captchaToken}
             >
               {loading ? <span className="spinner" style={{ width: 20, height: 20 }} /> : 'Create Account'}
             </button>
