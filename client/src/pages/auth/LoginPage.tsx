@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { TrendingUp, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import './Auth.css';
 
 const LoginPage: React.FC = () => {
@@ -23,7 +24,7 @@ const LoginPage: React.FC = () => {
       await login(email, password);
       navigate('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials. Please try again.');
+      setError(getApiErrorMessage(err, 'Invalid credentials. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -35,18 +36,18 @@ const LoginPage: React.FC = () => {
       <div className="auth-left">
         <div className="auth-brand">
           <div className="auth-brand-icon">
-            <TrendingUp size={36} color="#fff" />
+            <img src="/wealthmap-logo.png" alt="WealthMap" />
           </div>
           <h1>WealthMap</h1>
-          <p className="auth-tagline">Predict. Simulate. Prevent.</p>
+          <p className="auth-tagline">Your student money companion</p>
         </div>
 
         <div className="auth-features">
           {[
-            { emoji: '📊', title: 'Smart Budgets', desc: 'Track spending vs limits in real-time' },
-            { emoji: '🔮', title: 'Forecast Engine', desc: 'See month-end expenses before they happen' },
-            { emoji: '⚡', title: 'What-If Simulator', desc: 'Test financial decisions safely' },
-            { emoji: '🤖', title: 'AI Recommendations', desc: 'Personalized financial guidance' },
+            { emoji: '📊', title: 'Campus-life budgets', desc: 'Plan for food, travel, books and more' },
+            { emoji: '🔮', title: 'Know what’s coming', desc: 'See if your money can last the month' },
+            { emoji: '⚡', title: 'Try a what-if', desc: 'Check a purchase before committing' },
+            { emoji: '🤖', title: 'Clear next steps', desc: 'Get useful insights from your own numbers' },
           ].map((f) => (
             <div className="auth-feature-card" key={f.title}>
               <span className="auth-feature-icon">{f.emoji}</span>
@@ -63,8 +64,8 @@ const LoginPage: React.FC = () => {
       <div className="auth-right">
         <div className="auth-card neu-raised fade-in">
           <div className="auth-card-header">
-            <h2>Welcome back 👋</h2>
-            <p>Sign in to your WealthMap account</p>
+            <h2>Welcome back</h2>
+            <p>Pick up where you left off with your student budget.</p>
           </div>
 
           {error && (
@@ -112,6 +113,9 @@ const LoginPage: React.FC = () => {
                 >
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
+              </div>
+              <div className="auth-form-meta">
+                <Link to="/forgot-password">Forgot password?</Link>
               </div>
             </div>
 

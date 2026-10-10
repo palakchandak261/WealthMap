@@ -1,6 +1,5 @@
 /* ============================================================
    WealthMap — Global Design System
-   Neumorphic Light Theme
    ============================================================ */
 
 /* --- Google Font (Inter) --- */
@@ -9,63 +8,62 @@
 /* --- CSS Custom Properties (Design Tokens) --- */
 :root {
   /* Base backgrounds */
-  --bg-base:    #EEF2FF;
+  --bg-base:    #F5F8F7;
   --bg-surface: #FFFFFF;
-  --bg-subtle:  #E4E9F7;
+  --bg-subtle:  #E8EFEC;
 
-  /* Primary — Lavender Blue */
-  --primary-100: #EEF0FF;
-  --primary-200: #D6DBFF;
-  --primary-300: #A5B4FC;
-  --primary-500: #7B8CDE;
-  --primary-600: #6272C8;
-  --primary-700: #4D5BA8;
+  /* Primary — Evergreen */
+  --primary-100: #E7F5EF;
+  --primary-200: #C5E9D9;
+  --primary-300: #8BD0B2;
+  --primary-500: #218565;
+  --primary-600: #176E53;
+  --primary-700: #125640;
 
   /* Semantic colors */
-  --success:       #4ECDC4;
-  --success-light: #D0F5F3;
-  --success-dark:  #2BA89F;
+  --success:       #2FA77A;
+  --success-light: #E6F6EF;
+  --success-dark:  #19734F;
 
-  --warning:       #FFB347;
-  --warning-light: #FFF3D8;
-  --warning-dark:  #E09020;
+  --warning:       #E7A83E;
+  --warning-light: #FFF5E3;
+  --warning-dark:  #9B6412;
 
-  --danger:       #FF6B6B;
-  --danger-light: #FFE5E5;
-  --danger-dark:  #CC4444;
+  --danger:       #E36B6B;
+  --danger-light: #FFF0EF;
+  --danger-dark:  #B83B3B;
 
-  --critical:       #E63946;
-  --critical-light: #FFDDE0;
+  --critical:       #C83F4B;
+  --critical-light: #FCEBED;
 
   /* Text */
-  --text-primary:   #1A1F36;
-  --text-secondary: #4A5578;
-  --text-muted:     #8892B0;
+  --text-primary:   #182923;
+  --text-secondary: #53675F;
+  --text-muted:     #82928B;
   --text-white:     #FFFFFF;
 
-  /* Neumorphism shadows */
+  /* Subtle elevation */
   --neu-raised:
-    8px 8px 18px rgba(163, 177, 198, 0.45),
-    -6px -6px 14px rgba(255, 255, 255, 0.95);
+    0 16px 36px rgba(26, 57, 44, 0.07),
+    0 2px 6px rgba(26, 57, 44, 0.035);
 
   --neu-raised-sm:
-    5px 5px 12px rgba(163, 177, 198, 0.4),
-    -4px -4px 10px rgba(255, 255, 255, 0.9);
+    0 8px 20px rgba(26, 57, 44, 0.055),
+    0 1px 3px rgba(26, 57, 44, 0.035);
 
   --neu-inset:
-    inset 5px 5px 10px rgba(163, 177, 198, 0.4),
-    inset -4px -4px 10px rgba(255, 255, 255, 0.9);
+    inset 0 1px 2px rgba(24, 41, 35, 0.04);
 
   --neu-btn:
-    4px 4px 10px rgba(123, 140, 222, 0.45),
-    -2px -2px 8px rgba(255, 255, 255, 0.75);
+    0 7px 16px rgba(33, 133, 101, 0.18);
 
   /* Borders & Radius */
   --radius-sm:  8px;
-  --radius-md:  14px;
-  --radius-lg:  20px;
-  --radius-xl:  28px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
   --radius-full: 9999px;
+  --border: #E5ECE8;
 
   /* Transitions */
   --transition: 0.2s ease;
@@ -93,6 +91,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+button, input, select, textarea {
+  font: inherit;
+}
+
 /* --- Typography --- */
 h1 { font-size: 1.75rem; font-weight: 700; color: var(--text-primary); }
 h2 { font-size: 1.375rem; font-weight: 700; color: var(--text-primary); }
@@ -112,12 +114,14 @@ a:hover { color: var(--primary-700); }
   background: var(--bg-surface);
   box-shadow: var(--neu-raised);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
 }
 
 .neu-raised-sm {
   background: var(--bg-surface);
   box-shadow: var(--neu-raised-sm);
   border-radius: var(--radius-md);
+  border: 1px solid var(--border);
 }
 
 .neu-inset {
@@ -132,13 +136,13 @@ input, select, textarea {
   font-size: 0.9rem;
   width: 100%;
   padding: 0.75rem 1rem;
-  background: var(--bg-base);
-  border: none;
-  border-radius: var(--radius-md);
-  box-shadow: var(--neu-inset);
+  background: var(--bg-surface);
+  border: 1px solid #DCE6E0;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
   color: var(--text-primary);
   outline: none;
-  transition: box-shadow var(--transition);
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 input::placeholder, textarea::placeholder {
@@ -146,7 +150,8 @@ input::placeholder, textarea::placeholder {
 }
 
 input:focus, select:focus, textarea:focus {
-  box-shadow: var(--neu-inset), 0 0 0 3px rgba(123, 140, 222, 0.25);
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px rgba(33, 133, 101, 0.12);
 }
 
 /* --- Buttons --- */
@@ -167,17 +172,15 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-primary {
-  background: var(--primary-500);
+  background: var(--primary-600);
   color: var(--text-white);
   box-shadow: var(--neu-btn);
 }
 
 .btn-primary:hover {
-  background: var(--primary-600);
+  background: var(--primary-700);
   transform: translateY(-1px);
-  box-shadow:
-    6px 6px 14px rgba(123, 140, 222, 0.5),
-    -2px -2px 10px rgba(255, 255, 255, 0.8);
+  box-shadow: 0 10px 20px rgba(33, 133, 101, 0.24);
 }
 
 .btn-primary:active {
@@ -187,19 +190,20 @@ input:focus, select:focus, textarea:focus {
 
 .btn-secondary {
   background: var(--bg-surface);
-  color: var(--primary-500);
-  box-shadow: var(--neu-raised-sm);
+  color: var(--text-primary);
+  box-shadow: none;
+  border: 1px solid var(--border);
 }
 
 .btn-secondary:hover {
-  background: var(--primary-100);
+  background: #F7FAF8;
   transform: translateY(-1px);
 }
 
 .btn-danger {
   background: var(--danger);
   color: var(--text-white);
-  box-shadow: 4px 4px 10px rgba(255, 107, 107, 0.4), -2px -2px 8px rgba(255,255,255,0.75);
+  box-shadow: 0 6px 16px rgba(184, 59, 59, 0.18);
 }
 
 .btn-danger:hover {
@@ -343,7 +347,8 @@ input:focus, select:focus, textarea:focus {
 .modal-card {
   background: var(--bg-surface);
   border-radius: var(--radius-xl);
-  box-shadow: var(--neu-raised);
+  box-shadow: 0 24px 72px rgba(18, 44, 33, 0.2);
+  border: 1px solid var(--border);
   padding: 2rem;
   width: 100%;
   max-width: 480px;
@@ -380,7 +385,6 @@ input:focus, select:focus, textarea:focus {
 .data-table tbody tr td:last-child  { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
 
 .data-table tbody tr {
-  box-shadow: var(--neu-raised-sm);
   transition: transform var(--transition);
 }
 .data-table tbody tr:hover { transform: translateX(3px); }
@@ -406,3 +410,136 @@ input:focus, select:focus, textarea:focus {
   margin-bottom: 1rem;
 }
 .card-header h3 { margin: 0; }
+
+/* Shared product polish */
+::selection {
+  color: #124632;
+  background: #C8E8D5;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(33, 133, 101, 0.35);
+  outline-offset: 2px;
+}
+
+.main-content {
+  background:
+    radial-gradient(ellipse at 90% 0, rgba(226, 241, 232, 0.34), transparent 34%),
+    #F5F8F7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header h1 {
+  font-size: clamp(1.65rem, 3vw, 2rem);
+  letter-spacing: -0.055em;
+}
+
+.page-header p {
+  color: #74857C;
+  font-size: 0.86rem;
+}
+
+.btn {
+  border-radius: 10px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #268B68, #176E53);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #21805F, #125640);
+}
+
+.btn-secondary {
+  color: #365348;
+}
+
+.btn-secondary:hover {
+  color: var(--primary-700);
+  background: #F4F8F5;
+}
+
+.badge {
+  padding: 0.28rem 0.62rem;
+  font-size: 0.7rem;
+}
+
+.alert-bar {
+  border-left-width: 3px;
+}
+
+.modal-card {
+  border-radius: 18px;
+}
+
+.data-table {
+  border-spacing: 0;
+  border-collapse: separate;
+}
+
+.data-table th {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: #F7F9F8;
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+}
+
+.data-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #EDF1EE;
+  background: #FFFFFF;
+}
+
+.data-table tbody tr {
+  box-shadow: none;
+}
+
+.data-table tbody tr:hover {
+  transform: none;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.empty-state {
+  color: var(--text-muted);
+}
+
+.chart-tooltip {
+  border: 1px solid var(--border);
+  box-shadow: var(--neu-raised-sm);
+}
+
+.divider {
+  background: var(--border);
+}
+
+@media (max-width: 640px) {
+  .page-header-row,
+  .dashboard-header-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-header-row > .btn,
+  .dashboard-header-row > .btn {
+    align-self: flex-start;
+  }
+}

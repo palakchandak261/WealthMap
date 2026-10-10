@@ -4,6 +4,7 @@ import {
   CreditCard, Clock, AlertTriangle,
 } from 'lucide-react';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { Obligation, ObligationType, Frequency } from '../../types';
 import '../../components/shared/Page.css';
@@ -13,8 +14,8 @@ const OBL_TYPES: ObligationType[] = ['EMI', 'RENT', 'BILL', 'SUBSCRIPTION', 'INS
 const FREQUENCIES: Frequency[] = ['ONE_TIME', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'];
 
 const typeColors: Record<string, string> = {
-  EMI: '#FF6B6B', RENT: '#7B8CDE', BILL: '#FFB347',
-  SUBSCRIPTION: '#4ECDC4', INSURANCE: '#A5B4FC', LOAN: '#E63946', OTHER: '#8892B0',
+  EMI: 'var(--danger)', RENT: 'var(--primary-500)', BILL: 'var(--warning)',
+  SUBSCRIPTION: 'var(--success)', INSURANCE: 'var(--primary-300)', LOAN: 'var(--danger-dark)', OTHER: 'var(--text-muted)',
 };
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -49,7 +50,7 @@ const ObligationsPage: React.FC = () => {
     try {
       const { data } = await api.get('/obligations');
       setItems(data.data?.items ?? data.data ?? []);
-    } catch { setError('Could not load obligations.'); }
+    } catch (error) { setError(getApiErrorMessage(error, 'Could not load obligations.')); }
     finally { setLoading(false); }
   };
 
@@ -75,22 +76,33 @@ const ObligationsPage: React.FC = () => {
         ...form, amount: parseFloat(form.amount),
         dueDate: new Date(form.dueDate).toISOString(),
       };
-      if (editItem) await api.put(`/obligations/${editItem.id}`, payload);
+      if (editItem) await api.patch(`/obligations/${editItem.id}`, payload);
       else await api.post('/obligations', payload);
       setShowModal(false); fetchData();
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message ?? 'Save failed.');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not save this obligation.'));
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this obligation?')) return;
-    await api.delete(`/obligations/${id}`); fetchData();
+    setError('');
+    try {
+      await api.delete(`/obligations/${id}`);
+      await fetchData();
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not delete this obligation.'));
+    }
   };
 
   const handleTogglePaid = async (item: Obligation) => {
-    await api.put(`/obligations/${item.id}`, { ...item, isPaid: !item.isPaid, amount: Number(item.amount) });
-    fetchData();
+    setError('');
+    try {
+      await api.patch(`/obligations/${item.id}`, { isPaid: !item.isPaid });
+      await fetchData();
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not update this obligation.'));
+    }
   };
 
   const totalMonthly = items
@@ -116,6 +128,8 @@ const ObligationsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {error && !showModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 
       {/* Summary Row */}
       <div className="obl-summary-row">

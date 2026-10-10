@@ -1,25 +1,37 @@
 import { Request, Response, NextFunction } from "express";
-import { registerService, loginService, getMeService } from "./auth.service";
+import {
+  registerService, loginService, getMeService,
+  verifyEmailService, forgotPasswordService, resetPasswordService,
+} from "./auth.service";
 import { AuthRequest } from "../../middleware/authenticate";
 import { ok } from "../../lib/response";
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await registerService(req.body);
-    ok(res, result, "Account created", 201);
-  } catch (err) { next(err); }
+  try { ok(res, await registerService(req.body), "Account created. Check your email to verify.", 201); }
+  catch (err) { next(err); }
 };
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await loginService(req.body);
-    ok(res, result, "Login successful");
-  } catch (err) { next(err); }
+  try { ok(res, await loginService(req.body), "Login successful"); }
+  catch (err) { next(err); }
 };
 
 export const getMe = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const user = await getMeService(req.userId!);
-    ok(res, user);
-  } catch (err) { next(err); }
+  try { ok(res, await getMeService(req.userId!)); }
+  catch (err) { next(err); }
+};
+
+export const verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try { ok(res, await verifyEmailService(req.params.token)); }
+  catch (err) { next(err); }
+};
+
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try { ok(res, await forgotPasswordService(req.body.email)); }
+  catch (err) { next(err); }
+};
+
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try { ok(res, await resetPasswordService(req.body.token, req.body.password)); }
+  catch (err) { next(err); }
 };

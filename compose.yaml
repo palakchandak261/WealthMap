@@ -1,0 +1,21 @@
+services:
+  database:
+    image: mysql:8.0
+    container_name: wealthmap-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in server/.env}
+      MYSQL_DATABASE: wealthmap
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - wealthmap-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  wealthmap-mysql-data:

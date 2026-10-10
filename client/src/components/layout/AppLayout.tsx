@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, CreditCard, Target,
   DollarSign, Calendar, BarChart2, Shield, Zap,
-  GitBranch, Cpu, Sparkles, Bell, LogOut, Menu, X,
+  GitBranch, Cpu, Sparkles, LogOut, Menu, X,
   ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -33,16 +33,19 @@ const navItems: NavItem[] = [
 
 const groups = ['Overview', 'Finances', 'Intelligence', 'Advanced'];
 
-const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapsed, onToggle }) => {
+const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void; onNavigate?: () => void }> = ({
+  collapsed,
+  onToggle,
+  onNavigate,
+}) => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">
-          <TrendingUp size={22} color="#fff" />
+        <img src="/wealthmap-logo.png" alt="WealthMap" />
         </div>
         {!collapsed && <span className="sidebar-logo-text">WealthMap</span>}
         <button className="sidebar-toggle" onClick={onToggle} aria-label="Toggle sidebar">
@@ -65,6 +68,7 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
                     `nav-item ${isActive ? 'nav-item-active' : ''}`
                   }
                   title={collapsed ? item.label : undefined}
+                  onClick={onNavigate}
                 >
                   <span className="nav-item-icon">{item.icon}</span>
                   {!collapsed && <span className="nav-item-label">{item.label}</span>}
@@ -110,20 +114,43 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ colla
   );
 };
 
+const pageTitles: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/income': 'Income',
+  '/expenses': 'Expenses',
+  '/budgets': 'Budgets',
+  '/obligations': 'Obligations',
+  '/goals': 'Goals',
+  '/forecast': 'Forecast',
+  '/risk': 'Risk overview',
+  '/safe-to-spend': 'Safe to spend',
+  '/dependency-graph': 'Dependency graph',
+  '/simulation': 'Scenario simulator',
+  '/recommendations': 'AI recommendations',
+};
+
 const Topbar: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const pageTitle = pageTitles[pathname] ?? 'Your workspace';
 
   return (
     <header className="topbar">
-      <button className="topbar-menu-btn" onClick={onMenuClick} aria-label="Open menu">
-        <Menu size={20} />
-      </button>
-      <div className="topbar-right">
-        <button className="topbar-icon-btn" title="Notifications" aria-label="Notifications">
-          <Bell size={20} />
-          <span className="topbar-notif-dot" />
+      <div className="topbar-left">
+        <button className="topbar-menu-btn" onClick={onMenuClick} aria-label="Open menu">
+          <Menu size={20} />
         </button>
-        <div className="topbar-avatar">
+        <div className="topbar-heading">
+          <span className="topbar-eyebrow">WEALTHMAP WORKSPACE</span>
+          <strong className="topbar-title">{pageTitle}</strong>
+        </div>
+      </div>
+      <div className="topbar-right">
+        <div className="topbar-user-copy">
+          <span className="topbar-user-greeting">Signed in as</span>
+          <strong>{user?.name ?? 'User'}</strong>
+        </div>
+        <div className="topbar-avatar" aria-hidden="true">
           {user?.name?.charAt(0).toUpperCase() ?? 'U'}
         </div>
       </div>
@@ -145,7 +172,11 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             onClick={(e) => e.stopPropagation()}
             style={{ transform: 'translateX(0)' }}
           >
-            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />
+            <Sidebar
+              collapsed={false}
+              onToggle={() => setMobileOpen(false)}
+              onNavigate={() => setMobileOpen(false)}
+            />
             <button className="mobile-close" onClick={() => setMobileOpen(false)}>
               <X size={20} />
             </button>

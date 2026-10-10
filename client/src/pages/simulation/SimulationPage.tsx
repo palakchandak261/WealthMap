@@ -4,6 +4,7 @@ import {
   TrendingDown, Target, Shield, RefreshCw, Play,
 } from 'lucide-react';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency } from '../../utils/formatters';
 import type { SimulationResult } from '../../types';
 import './Simulation.css';
@@ -60,8 +61,8 @@ const SimulationPage: React.FC = () => {
         description: form.description || `Simulated ${form.category} expense`,
       });
       setResult(data.data);
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message ?? 'Simulation failed. Make sure the backend is running.');
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'Simulation failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -145,7 +146,7 @@ const SimulationPage: React.FC = () => {
             <h4 style={{ marginBottom: '0.75rem' }}>How it works</h4>
             <ol className="sim-how-list">
               <li>Enter a hypothetical expense (amount + category)</li>
-              <li>The engine calculates the impact on your budget, risk, health, and goals</li>
+              <li>The engine estimates the impact on your budget, cash, risk, and financial health</li>
               <li>Compare current vs simulated state side-by-side</li>
               <li>Make an informed spending decision!</li>
             </ol>
@@ -156,19 +157,16 @@ const SimulationPage: React.FC = () => {
         {result && (
           <div className="sim-results fade-in">
             {/* Warning Banner */}
-            {result.warnings.length > 0 && (
-              <div className="alert-bar alert-bar-warning" style={{ marginBottom: '1.25rem', borderRadius: 'var(--radius-lg)' }}>
-                <AlertTriangle size={18} />
-                <div>
-                  {result.warnings.map((w, i) => <div key={i} style={{ fontSize: '0.875rem' }}>{w}</div>)}
-                </div>
+            <div
+              className={`alert-bar ${result.safe ? 'alert-bar-success' : 'alert-bar-warning'}`}
+              style={{ marginBottom: '1.25rem', borderRadius: 'var(--radius-lg)' }}
+            >
+              {result.safe ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
+              <div>
+                <strong>{result.safe ? 'This looks manageable' : 'Review the impact before spending'}</strong>
+                <div style={{ fontSize: '0.875rem' }}>{result.verdict}</div>
               </div>
-            )}
-            {result.warnings.length === 0 && (
-              <div className="alert-bar alert-bar-success" style={{ marginBottom: '1.25rem', borderRadius: 'var(--radius-lg)' }}>
-                <CheckCircle size={18} /> This expense looks safe — no major risks detected!
-              </div>
-            )}
+            </div>
 
             {/* Comparison Grid */}
             <div className="sim-compare-grid">
@@ -182,19 +180,19 @@ const SimulationPage: React.FC = () => {
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Current</span>
                     <div style={{ fontWeight: 700, fontSize: '1.15rem', color: 'var(--success-dark)' }}>
-                      {formatCurrency(result.current.budgetRemaining)}
+                      {formatCurrency(result.before.budgetRemaining)}
                     </div>
                   </div>
                   <div className="sim-arrow">→</div>
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Simulated</span>
-                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.simulated.budgetRemaining < 0 ? 'var(--danger-dark)' : 'var(--text-primary)' }}>
-                      {formatCurrency(result.simulated.budgetRemaining)}
+                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.after.budgetRemaining < 0 ? 'var(--danger-dark)' : 'var(--text-primary)' }}>
+                      {formatCurrency(result.after.budgetRemaining)}
                     </div>
                   </div>
                 </div>
                 <div style={{ marginTop: '0.5rem' }}>
-                  <DeltaTag delta={result.delta.budgetRemaining} />
+                  <DeltaTag delta={result.diff.budgetImpact} />
                 </div>
               </div>
 
@@ -207,18 +205,18 @@ const SimulationPage: React.FC = () => {
                 <div className="sim-compare-row">
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Current</span>
-                    <div style={{ fontWeight: 700, fontSize: '1.15rem' }}>{formatCurrency(result.current.balance)}</div>
+                    <div style={{ fontWeight: 700, fontSize: '1.15rem' }}>{formatCurrency(result.before.cashBalance)}</div>
                   </div>
                   <div className="sim-arrow">→</div>
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Simulated</span>
-                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.simulated.balance < 0 ? 'var(--danger-dark)' : 'var(--text-primary)' }}>
-                      {formatCurrency(result.simulated.balance)}
+                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.after.cashBalance < 0 ? 'var(--danger-dark)' : 'var(--text-primary)' }}>
+                      {formatCurrency(result.after.cashBalance)}
                     </div>
                   </div>
                 </div>
                 <div style={{ marginTop: '0.5rem' }}>
-                  <DeltaTag delta={result.delta.balance} />
+                  <DeltaTag delta={result.diff.cashImpact} />
                 </div>
               </div>
 
@@ -231,18 +229,18 @@ const SimulationPage: React.FC = () => {
                 <div className="sim-compare-row">
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Current</span>
-                    <div style={{ fontWeight: 700, fontSize: '1.15rem' }}>{result.current.riskScore}/100</div>
+                    <div style={{ fontWeight: 700, fontSize: '1.15rem' }}>{result.before.riskScore}/100</div>
                   </div>
                   <div className="sim-arrow">→</div>
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Simulated</span>
-                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.simulated.riskScore > result.current.riskScore ? 'var(--danger-dark)' : 'var(--success-dark)' }}>
-                      {result.simulated.riskScore}/100
+                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.after.riskScore > result.before.riskScore ? 'var(--danger-dark)' : 'var(--success-dark)' }}>
+                      {result.after.riskScore}/100
                     </div>
                   </div>
                 </div>
                 <div style={{ marginTop: '0.5rem' }}>
-                  <DeltaTagNum delta={result.delta.riskScore} suffix=" pts" invert={true} />
+                  <DeltaTagNum delta={result.diff.riskDelta} suffix=" pts" invert={true} />
                 </div>
               </div>
 
@@ -255,53 +253,22 @@ const SimulationPage: React.FC = () => {
                 <div className="sim-compare-row">
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Current</span>
-                    <div style={{ fontWeight: 700, fontSize: '1.15rem' }}>{result.current.healthScore}/100</div>
+                    <div style={{ fontWeight: 700, fontSize: '1.15rem' }}>{result.before.healthScore}/100</div>
                   </div>
                   <div className="sim-arrow">→</div>
                   <div className="sim-val-col">
                     <span className="text-muted" style={{ fontSize: '0.75rem' }}>Simulated</span>
-                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.simulated.healthScore < result.current.healthScore ? 'var(--danger-dark)' : 'var(--success-dark)' }}>
-                      {result.simulated.healthScore}/100
+                    <div style={{ fontWeight: 700, fontSize: '1.15rem', color: result.after.healthScore < result.before.healthScore ? 'var(--danger-dark)' : 'var(--success-dark)' }}>
+                      {result.after.healthScore}/100
                     </div>
                   </div>
                 </div>
                 <div style={{ marginTop: '0.5rem' }}>
-                  <DeltaTagNum delta={result.delta.healthScore} suffix=" pts" />
+                  <DeltaTagNum delta={result.diff.healthDelta} suffix=" pts" />
                 </div>
               </div>
             </div>
 
-            {/* Affected Goals */}
-            {result.affectedGoals.length > 0 && (
-              <div className="neu-raised sim-impact-card">
-                <h4 style={{ marginBottom: '0.75rem', color: 'var(--warning-dark)' }}>
-                  <Target size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                  Goals Impact
-                </h4>
-                {result.affectedGoals.map((g, i) => (
-                  <div key={i} className="alert-bar alert-bar-warning" style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                    <AlertTriangle size={14} />
-                    <span><strong>{g.name}</strong>: {g.impact}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Affected Obligations */}
-            {result.affectedObligations.length > 0 && (
-              <div className="neu-raised sim-impact-card">
-                <h4 style={{ marginBottom: '0.75rem', color: 'var(--danger-dark)' }}>
-                  <Shield size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                  Obligations Impact
-                </h4>
-                {result.affectedObligations.map((o, i) => (
-                  <div key={i} className="alert-bar alert-bar-danger" style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                    <AlertTriangle size={14} />
-                    <span><strong>{o.name}</strong>: {o.impact}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 

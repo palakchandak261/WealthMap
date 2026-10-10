@@ -4,6 +4,7 @@ import {
   TrendingUp, Calendar, Award,
 } from 'lucide-react';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { Goal, GoalStatus } from '../../types';
 import '../../components/shared/Page.css';
@@ -40,7 +41,7 @@ const GoalsPage: React.FC = () => {
     try {
       const { data } = await api.get('/goals');
       setItems(data.data?.items ?? data.data ?? []);
-    } catch { setError('Could not load goals.'); }
+    } catch (error) { setError(getApiErrorMessage(error, 'Could not load goals.')); }
     finally { setLoading(false); }
   };
 
@@ -70,17 +71,23 @@ const GoalsPage: React.FC = () => {
         deadline: form.deadline ? new Date(form.deadline).toISOString() : undefined,
         status: form.status,
       };
-      if (editItem) await api.put(`/goals/${editItem.id}`, payload);
+      if (editItem) await api.patch(`/goals/${editItem.id}`, payload);
       else await api.post('/goals', payload);
       setShowModal(false); fetchData();
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message ?? 'Save failed.');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not save this goal.'));
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this goal?')) return;
-    await api.delete(`/goals/${id}`); fetchData();
+    setError('');
+    try {
+      await api.delete(`/goals/${id}`);
+      await fetchData();
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not delete this goal.'));
+    }
   };
 
   const openContrib = (goal: Goal) => {
@@ -89,18 +96,22 @@ const GoalsPage: React.FC = () => {
 
   const handleContrib = async () => {
     if (!contribGoal || !contribAmount) return;
-    const newAmount = Math.min(
-      Number(contribGoal.targetAmount),
-      Number(contribGoal.currentAmount) + parseFloat(contribAmount),
+    setError('');
+    const amount = Math.min(
+      parseFloat(contribAmount),
+      Number(contribGoal.targetAmount) - Number(contribGoal.currentAmount),
     );
-    await api.put(`/goals/${contribGoal.id}`, {
-      ...contribGoal,
-      currentAmount: newAmount,
-      targetAmount: Number(contribGoal.targetAmount),
-      status: newAmount >= Number(contribGoal.targetAmount) ? 'COMPLETED' : contribGoal.status,
-    });
-    setShowContribModal(false);
-    fetchData();
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Enter a positive amount that does not exceed the remaining goal.');
+      return;
+    }
+    try {
+      await api.patch(`/goals/${contribGoal.id}/contribute`, { amount });
+      setShowContribModal(false);
+      await fetchData();
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not update this goal contribution.'));
+    }
   };
 
   const totalTarget = items.filter(g => g.status === 'ACTIVE').reduce((s, g) => s + Number(g.targetAmount), 0);
@@ -122,6 +133,8 @@ const GoalsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {error && !showModal && !showContribModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 
       {/* Summary */}
       <div className="goals-summary-row">

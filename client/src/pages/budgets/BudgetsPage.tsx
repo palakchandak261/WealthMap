@@ -4,8 +4,9 @@ import {
   AlertTriangle, TrendingUp, Trash2,
 } from 'lucide-react';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency } from '../../utils/formatters';
-import type { Budget, CategoryBudget } from '../../types';
+import type { Budget, CategoryBudget, ForecastResult } from '../../types';
 import '../../components/shared/Page.css';
 import './Budgets.css';
 
@@ -38,23 +39,33 @@ const BudgetsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   // Forecast data for utilization
-  const [forecast, setForecast] = useState<any>(null);
+  const [forecast, setForecast] = useState<ForecastResult | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
       const [bRes, fRes] = await Promise.allSettled([
-        api.get(`/budgets?month=${month}&year=${year}`),
+        api.get('/budgets/current'),
         api.get('/engine/forecast'),
       ]);
+      const loadErrors: string[] = [];
       if (bRes.status === 'fulfilled') {
         const d = bRes.value.data.data;
         setBudget(Array.isArray(d) ? d[0] ?? null : d);
+      } else {
+        setBudget(null);
+        loadErrors.push(getApiErrorMessage(bRes.reason, 'Could not load your budget.'));
       }
-      if (fRes.status === 'fulfilled') setForecast(fRes.value.data.data);
-    } catch { /* no budget yet */ }
+      if (fRes.status === 'fulfilled') {
+        setForecast(fRes.value.data.data);
+      } else {
+        setForecast(null);
+        loadErrors.push(getApiErrorMessage(fRes.reason, 'Could not load the spending forecast.'));
+      }
+      setError(loadErrors.join(' '));
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not load budget data.'));
+    }
     finally { setLoading(false); }
   };
 
@@ -75,12 +86,12 @@ const BudgetsPage: React.FC = () => {
         year: now.getFullYear(),
         totalBudget: parseFloat(totalBudget),
       };
-      if (budget) await api.put(`/budgets/${budget.id}`, payload);
-      else await api.post('/budgets', payload);
+      if (budget) await api.patch(`/budgets/${budget.id}`, payload);
+      else await api.post('/budgets', { ...payload, categoryBudgets: [] });
       setShowBudgetModal(false);
       fetchData();
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message ?? 'Failed to save budget.');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not save this budget.'));
     } finally { setSaving(false); }
   };
 
@@ -97,27 +108,35 @@ const BudgetsPage: React.FC = () => {
     setSaving(true); setError('');
     try {
       const payload = { category: catForm.category, limit: parseFloat(catForm.limit) };
-      if (editCat) {
-        await api.put(`/budgets/${budget.id}/categories/${editCat.id}`, payload);
-      } else {
-        await api.post(`/budgets/${budget.id}/categories`, payload);
-      }
+      const categoryBudgets = budget.categoryBudgets
+        .filter((category) => category.id !== editCat?.id)
+        .map((category) => ({ category: category.category, limit: Number(category.limit) }));
+      categoryBudgets.push(payload);
+      await api.patch(`/budgets/${budget.id}`, { categoryBudgets });
       setShowCatModal(false);
       fetchData();
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message ?? 'Failed to save category budget.');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not save this category budget.'));
     } finally { setSaving(false); }
   };
 
   const handleDeleteCat = async (catId: string) => {
     if (!budget || !window.confirm('Remove this category budget?')) return;
-    await api.delete(`/budgets/${budget.id}/categories/${catId}`);
-    fetchData();
+    setError('');
+    try {
+      const categoryBudgets = budget.categoryBudgets
+        .filter((category) => category.id !== catId)
+        .map((category) => ({ category: category.category, limit: Number(category.limit) }));
+      await api.patch(`/budgets/${budget.id}`, { categoryBudgets });
+      await fetchData();
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not remove this category budget.'));
+    }
   };
 
   // Merge category budgets with forecast data
   const catRows = (budget?.categoryBudgets ?? []).map(cb => {
-    const fc = forecast?.categories?.find((c: any) => c.category === cb.category);
+    const fc = forecast?.categoryForecasts.find((c) => c.category === cb.category);
     const spent = fc ? Number(fc.spent) : 0;
     const pct = cb.limit > 0 ? Math.min(200, (spent / Number(cb.limit)) * 100) : 0;
     return { ...cb, spent, pct };
@@ -147,6 +166,8 @@ const BudgetsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {error && !showBudgetModal && !showCatModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 
       {loading ? (
         <div className="loading-row"><div className="spinner" /></div>

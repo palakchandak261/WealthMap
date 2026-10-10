@@ -14,7 +14,10 @@
 .loading-row {
   display: flex; justify-content: center; padding: 3rem;
 }
-.table-card { padding: 0.75rem; }
+.table-card {
+  padding: 0.75rem;
+  overflow-x: auto;
+}
 .action-btns { display: flex; gap: 0.4rem; }
 .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
 .progress-bar-wrap {

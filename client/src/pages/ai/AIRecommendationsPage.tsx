@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-  Sparkles, RefreshCw, CheckCircle, AlertTriangle, Zap,
-  Brain, ChevronRight, Send,
+  Sparkles, RefreshCw, CheckCircle, AlertTriangle,
+  Brain, Send, Shield, HeartPulse, TrendingUp,
 } from 'lucide-react';
 import api from '../../services/api';
 import type { AIRecommendation } from '../../types';
@@ -141,11 +141,28 @@ const AIRecommendationsPage: React.FC = () => {
           <div className="neu-raised ai-summary-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
               <Sparkles size={18} color="var(--primary-500)" />
-              <h3 style={{ margin: 0 }}>Financial Summary</h3>
+              <h3 style={{ margin: 0 }}>Your financial snapshot</h3>
             </div>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8, fontSize: '0.95rem' }}>
-              {result.summary}
-            </p>
+            <div className="ai-summary-stats">
+              <div className="ai-summary-stat">
+                <Shield size={17} />
+                <span>Risk level</span>
+                <strong>{result.context.riskLevel}</strong>
+                <small>{result.context.riskScore}/100 risk score</small>
+              </div>
+              <div className="ai-summary-stat">
+                <HeartPulse size={17} />
+                <span>Financial health</span>
+                <strong>{result.context.healthGrade}</strong>
+                <small>{result.context.healthScore}/100 health score</small>
+              </div>
+              <div className="ai-summary-stat">
+                <TrendingUp size={17} />
+                <span>Month-end outlook</span>
+                <strong>{result.context.willExceedBudget ? 'Review spending' : 'On track'}</strong>
+                <small>{result.context.willExceedBudget ? 'Projected over budget' : 'Within your planned budget'}</small>
+              </div>
+            </div>
           </div>
 
           <div className="ai-two-col">
@@ -154,33 +171,14 @@ const AIRecommendationsPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
                 <CheckCircle size={18} color="var(--success-dark)" />
                 <h3 style={{ margin: 0 }}>Recommendations</h3>
-                <span className="badge badge-success">{result.recommendations.length}</span>
+                <span className="badge badge-success">{result.recommendations?.length ?? 0}</span>
               </div>
               <div className="ai-recs-list">
-                {result.recommendations.map((rec, i) => (
+                {(result.recommendations ?? []).map((rec, i) => (
                   <div key={i} className="ai-rec-item">
                     <div className="ai-rec-num">{i + 1}</div>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.7, margin: 0 }}>
                       {rec}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Priority Actions */}
-            <div className="neu-raised ai-actions-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
-                <Zap size={18} color="var(--warning-dark)" />
-                <h3 style={{ margin: 0 }}>Priority Actions</h3>
-                <span className="badge badge-warning">{result.priorityActions.length}</span>
-              </div>
-              <div className="ai-actions-list">
-                {result.priorityActions.map((action, i) => (
-                  <div key={i} className="ai-action-item">
-                    <ChevronRight size={16} color="var(--warning-dark)" style={{ flexShrink: 0, marginTop: 2 }} />
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.7, margin: 0 }}>
-                      {action}
                     </p>
                   </div>
                 ))}

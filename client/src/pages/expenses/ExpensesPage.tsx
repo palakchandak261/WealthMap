@@ -4,6 +4,7 @@ import {
   Filter, TrendingDown, Search,
 } from 'lucide-react';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { Expense } from '../../types';
 import '../../components/shared/Page.css';
@@ -25,10 +26,10 @@ const defaultForm = {
 };
 
 const categoryColors: Record<string, string> = {
-  FOOD: '#4ECDC4', TRANSPORT: '#FFB347', SHOPPING: '#7B8CDE',
-  ENTERTAINMENT: '#FF6B6B', HEALTH: '#A5B4FC', EDUCATION: '#4ECDC4',
-  UTILITIES: '#FFB347', RENT: '#FF6B6B', EMI: '#E63946',
-  INSURANCE: '#6272C8', TRAVEL: '#4ECDC4', OTHER: '#8892B0',
+  FOOD: '#2FA77A', TRANSPORT: '#218565', SHOPPING: '#7C9B8C',
+  ENTERTAINMENT: '#E7A83E', HEALTH: '#5C9CB5', EDUCATION: '#176E53',
+  UTILITIES: '#9B6412', RENT: '#53675F', EMI: '#B83B3B',
+  INSURANCE: '#6A8A77', TRAVEL: '#4D8C70', OTHER: '#82928B',
 };
 
 const ExpensesPage: React.FC = () => {
@@ -47,8 +48,8 @@ const ExpensesPage: React.FC = () => {
     try {
       const { data } = await api.get('/expenses');
       setItems(data.data?.items ?? data.data ?? []);
-    } catch {
-      setError('Could not load expense records.');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not load expense records.'));
     } finally {
       setLoading(false);
     }
@@ -80,12 +81,12 @@ const ExpensesPage: React.FC = () => {
         amount: parseFloat(form.amount),
         spentAt: new Date(form.spentAt).toISOString(),
       };
-      if (editItem) await api.put(`/expenses/${editItem.id}`, payload);
+      if (editItem) await api.patch(`/expenses/${editItem.id}`, payload);
       else await api.post('/expenses', payload);
       setShowModal(false);
       fetchData();
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message ?? 'Save failed.');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not save this expense.'));
     } finally {
       setSaving(false);
     }
@@ -93,8 +94,13 @@ const ExpensesPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this expense?')) return;
-    await api.delete(`/expenses/${id}`);
-    fetchData();
+    setError('');
+    try {
+      await api.delete(`/expenses/${id}`);
+      await fetchData();
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not delete this expense.'));
+    }
   };
 
   const filtered = useMemo(() => {
@@ -129,6 +135,8 @@ const ExpensesPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {error && !showModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 
       {/* Summary Row */}
       <div className="expenses-summary-row">

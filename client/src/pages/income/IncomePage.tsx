@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, DollarSign, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { Income } from '../../types';
 import '../../components/shared/Page.css';
@@ -23,7 +24,7 @@ const IncomePage: React.FC = () => {
     try {
       const { data } = await api.get('/income');
       setItems(data.data?.items ?? data.data ?? []);
-    } catch { setError('Could not load income records.'); }
+    } catch (error) { setError(getApiErrorMessage(error, 'Could not load income records.')); }
     finally { setLoading(false); }
   };
 
@@ -45,17 +46,23 @@ const IncomePage: React.FC = () => {
     setSaving(true); setError('');
     try {
       const payload = { ...form, amount: parseFloat(form.amount), receivedAt: new Date(form.receivedAt).toISOString() };
-      if (editItem) await api.put(`/income/${editItem.id}`, payload);
+      if (editItem) await api.patch(`/income/${editItem.id}`, payload);
       else await api.post('/income', payload);
       setShowModal(false); fetch();
-    } catch (e: any) {
-      setError(e.response?.data?.error?.message ?? 'Save failed.');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not save this income record.'));
     } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this income record?')) return;
-    await api.delete(`/income/${id}`); fetch();
+    setError('');
+    try {
+      await api.delete(`/income/${id}`);
+      await fetch();
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Could not delete this income record.'));
+    }
   };
 
   const totalMonthly = items.filter(i => i.frequency === 'MONTHLY').reduce((s, i) => s + Number(i.amount), 0);
@@ -66,13 +73,15 @@ const IncomePage: React.FC = () => {
         <div className="page-header-row">
           <div>
             <h1>Income</h1>
-            <p>Manage your income sources</p>
+            <p>Track allowances, scholarships, stipends and part-time income</p>
           </div>
           <button id="btn-add-income" className="btn btn-primary" onClick={openAdd}>
             <Plus size={16} /> Add Income
           </button>
         </div>
       </div>
+
+      {error && !showModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 
       {/* Summary */}
       <div className="summary-card neu-raised">
@@ -128,7 +137,7 @@ const IncomePage: React.FC = () => {
             {error && <div className="alert-bar alert-bar-danger" style={{marginBottom:'1rem'}}><AlertCircle size={15}/>{error}</div>}
             <div className="form-group">
               <label>Source</label>
-              <input placeholder="e.g. Salary, Freelance" value={form.source} onChange={e=>setForm({...form, source: e.target.value})} />
+              <input placeholder="e.g. Allowance, scholarship" value={form.source} onChange={e=>setForm({...form, source: e.target.value})} />
             </div>
             <div className="form-group">
               <label>Amount (₹)</label>

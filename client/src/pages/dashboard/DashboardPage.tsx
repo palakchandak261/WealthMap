@@ -6,11 +6,11 @@ import {
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, Cell,
+  ResponsiveContainer,
 } from 'recharts';
 import api from '../../services/api';
 import { formatCurrency, formatCurrencyCompact, riskLevelColor } from '../../utils/formatters';
-import type { FinancialState, ForecastResult, RiskResult } from '../../types';
+import type { FinancialState, ForecastResult, HealthScoreResult, RiskResult } from '../../types';
 import './Dashboard.css';
 
 // ── Stat Card ──────────────────────────────────────────────────────────────────
@@ -62,20 +62,23 @@ const DashboardPage: React.FC = () => {
   const [state, setState] = useState<FinancialState | null>(null);
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
   const [risk, setRisk] = useState<RiskResult | null>(null);
+  const [health, setHealth] = useState<HealthScoreResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const fetchAll = async () => {
     setLoading(true); setError('');
     try {
-      const [s, f, r] = await Promise.all([
+      const [s, f, r, h] = await Promise.all([
         api.get('/engine/financial-state'),
         api.get('/engine/forecast'),
         api.get('/engine/risk'),
+        api.get('/engine/health-score'),
       ]);
       setState(s.data.data);
       setForecast(f.data.data);
       setRisk(r.data.data);
+      setHealth(h.data.data);
     } catch {
       setError('Failed to load dashboard data. Make sure the backend is running.');
     } finally {
@@ -103,14 +106,15 @@ const DashboardPage: React.FC = () => {
   );
 
   // Chart data — budget vs actual by category
-  const chartData = forecast?.categories?.map((c) => ({
+  const chartData = forecast?.categoryForecasts?.map((c) => ({
     category: c.category.slice(0, 8),
-    Budget: Number(c.limit),
+    Budget: Number(c.budget),
     Actual: Number(c.spent),
     Projected: Number(c.projected),
   })) ?? [];
 
-  const utilizationPct = state?.budget?.utilizationPct ?? 0;
+  const utilizationPct = state?.overallUtilization ?? 0;
+  const activeAlerts = (risk?.alerts ?? []).filter((alert) => !alert.startsWith('✅'));
 
   return (
     <div className="dashboard">
@@ -131,44 +135,44 @@ const DashboardPage: React.FC = () => {
       <div className="stat-grid">
         <StatCard
           title="Monthly Income"
-          value={formatCurrencyCompact(state?.income?.monthly ?? 0)}
-          icon={<DollarSign size={22} color="#4ECDC4" />}
+          value={formatCurrencyCompact(state?.totalIncomeThisMonth || state?.declaredMonthlyIncome || 0)}
+          icon={<DollarSign size={22} color="var(--success-dark)" />}
           iconBg="var(--success-light)"
           subtitle="This month"
         />
         <StatCard
           title="Budget Used"
           value={`${utilizationPct.toFixed(0)}%`}
-          icon={<Target size={22} color="#7B8CDE" />}
+          icon={<Target size={22} color="var(--primary-600)" />}
           iconBg="var(--primary-100)"
-          subtitle={`${formatCurrencyCompact(state?.budget?.spent ?? 0)} of ${formatCurrencyCompact(state?.budget?.total ?? 0)}`}
+          subtitle={`${formatCurrencyCompact(state?.totalSpent ?? 0)} of ${formatCurrencyCompact(state?.totalBudget ?? 0)}`}
           trend={{ value: `${utilizationPct.toFixed(0)}% used`, positive: utilizationPct < 80 }}
         />
         <StatCard
           title="Remaining Budget"
-          value={formatCurrencyCompact(state?.budget?.remaining ?? 0)}
-          icon={<TrendingDown size={22} color="#FF6B6B" />}
+          value={formatCurrencyCompact(state?.totalRemaining ?? 0)}
+          icon={<TrendingDown size={22} color="var(--danger-dark)" />}
           iconBg="var(--danger-light)"
           subtitle="Left to spend"
         />
         <StatCard
           title="Safe to Spend"
-          value={formatCurrencyCompact(state?.safeToSpend ?? 0)}
-          icon={<Zap size={22} color="#FFB347" />}
+          value={formatCurrencyCompact(state?.safeDailySpending ?? 0)}
+          icon={<Zap size={22} color="var(--warning-dark)" />}
           iconBg="var(--warning-light)"
           subtitle="Per day recommended"
         />
         <StatCard
           title="Risk Score"
-          value={`${risk?.score ?? 0}/100`}
-          icon={<Shield size={22} color={riskLevelColor(risk?.level ?? 'LOW')} />}
-          iconBg={risk?.level === 'LOW' ? 'var(--success-light)' : risk?.level === 'MODERATE' ? 'var(--warning-light)' : 'var(--danger-light)'}
-          subtitle={risk?.level ?? 'LOW'}
+          value={`${risk?.riskScore ?? 0}/100`}
+          icon={<Shield size={22} color={riskLevelColor(risk?.riskLevel ?? 'LOW')} />}
+          iconBg={risk?.riskLevel === 'LOW' ? 'var(--success-light)' : risk?.riskLevel === 'MODERATE' ? 'var(--warning-light)' : 'var(--danger-light)'}
+          subtitle={risk?.riskLevel ?? 'LOW'}
         />
         <StatCard
           title="Health Score"
-          value={`${state?.healthScore ?? 0}/100`}
-          icon={<BarChart2 size={22} color="#7B8CDE" />}
+          value={`${health?.total ?? 0}/100`}
+          icon={<BarChart2 size={22} color="var(--primary-600)" />}
           iconBg="var(--primary-100)"
           subtitle="Financial fitness"
         />
@@ -207,33 +211,29 @@ const DashboardPage: React.FC = () => {
           <div className="card-header">
             <h3>Financial Health</h3>
           </div>
-          <HealthGauge score={state?.healthScore ?? 0} />
+          <HealthGauge score={health?.total ?? 0} />
         </div>
 
         {/* Alerts */}
         <div className="neu-raised dashboard-card">
           <div className="card-header">
             <h3>Alerts & Insights</h3>
-            <span className="badge badge-danger">{risk?.alerts?.length ?? 0}</span>
+            <span className="badge badge-danger">{activeAlerts.length}</span>
           </div>
           <div className="alerts-list">
-            {(risk?.alerts ?? []).length === 0 ? (
+            {activeAlerts.length === 0 ? (
               <div className="alert-bar alert-bar-success">
                 <CheckCircle size={16} />
                 All systems normal. Your finances look healthy!
               </div>
             ) : (
-              risk?.alerts?.slice(0, 5).map((alert, i) => (
+              activeAlerts.slice(0, 5).map((alert, i) => (
                 <div
                   key={i}
-                  className={`alert-bar alert-bar-${
-                    alert.severity === 'HIGH' || alert.severity === 'CRITICAL' ? 'danger'
-                    : alert.severity === 'MEDIUM' ? 'warning'
-                    : 'primary'
-                  }`}
+                  className={`alert-bar alert-bar-${alert.startsWith('🔴') ? 'danger' : alert.startsWith('⚠️') ? 'warning' : 'primary'}`}
                 >
                   <AlertTriangle size={15} />
-                  <span>{alert.message}</span>
+                  <span>{alert}</span>
                 </div>
               ))
             )}
@@ -253,19 +253,19 @@ const DashboardPage: React.FC = () => {
               </div>
               <div className="forecast-row">
                 <span>Current Spend</span>
-                <strong>{formatCurrency(forecast.currentSpend)}</strong>
+                <strong>{formatCurrency(state?.totalSpent ?? 0)}</strong>
               </div>
               <div className="forecast-row">
                 <span>Avg Daily Spend</span>
-                <strong>{formatCurrency(forecast.avgDailySpend)}</strong>
+                <strong>{formatCurrency(state?.avgDailySpending ?? 0)}</strong>
               </div>
-              {forecast.potentialOverrun > 0 && (
+              {forecast.expectedExcess > 0 && (
                 <div className="alert-bar alert-bar-danger" style={{ marginTop: '0.75rem' }}>
                   <AlertTriangle size={15} />
-                  Potential overrun: {formatCurrency(forecast.potentialOverrun)}
+                  Potential overrun: {formatCurrency(forecast.expectedExcess)}
                 </div>
               )}
-              {forecast.potentialOverrun <= 0 && (
+              {!forecast.willExceedBudget && (
                 <div className="alert-bar alert-bar-success" style={{ marginTop: '0.75rem' }}>
                   <CheckCircle size={15} />
                   On track — within budget!
@@ -283,13 +283,13 @@ const DashboardPage: React.FC = () => {
             <h3>Upcoming Obligations</h3>
           </div>
           <div className="obligations-list">
-            {(state?.obligations?.upcoming ?? []).length === 0 ? (
+            {(state?.upcomingObligations ?? []).length === 0 ? (
               <div className="empty-state" style={{ padding: '1.5rem' }}>
                 <CheckCircle size={28} color="var(--success)" />
                 <p>No upcoming obligations</p>
               </div>
             ) : (
-              state?.obligations?.upcoming?.slice(0, 4).map((ob) => (
+              state?.upcomingObligations?.slice(0, 4).map((ob) => (
                 <div className="obligation-item" key={ob.id}>
                   <div>
                     <span className="obligation-name">{ob.name}</span>

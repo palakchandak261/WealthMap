@@ -136,11 +136,93 @@
 .health-breakdown-list { display: flex; flex-direction: column; gap: 0.8rem; }
 .health-item {}
 
+.insight-tabs {
+  display: flex;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: -0.35rem 0 1.25rem;
+  padding: 0.3rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.insight-tabs a {
+  flex: 0 0 auto;
+  padding: 0.55rem 0.85rem;
+  border-radius: 9px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+}
+
+.insight-tabs a:hover {
+  color: var(--primary-700);
+  background: var(--primary-100);
+}
+
+.insight-tabs a.active {
+  color: var(--primary-700);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(24, 41, 35, 0.1);
+}
+
+.risk-top-grid-risk {
+  grid-template-columns: minmax(0, 420px);
+}
+
+.risk-top-grid-forecast,
+.risk-top-grid-safe {
+  grid-template-columns: minmax(0, 900px);
+}
+
+.risk-bottom-grid-forecast {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.risk-top-grid .risk-gauge-card,
+.risk-top-grid .safe-spend-card,
+.risk-top-grid .forecast-card {
+  min-width: 0;
+}
+
+.risk-gauge-card,
+.safe-spend-card,
+.forecast-card,
+.risk-alerts-card,
+.risk-breakdown-card,
+.risk-health-card,
+.risk-cat-card {
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(25, 64, 44, 0.055);
+}
+
+.safe-spend-amount {
+  color: var(--primary-700);
+}
+
 @media (max-width: 1100px) {
   .risk-top-grid,
   .risk-bottom-grid { grid-template-columns: 1fr 1fr; }
+
+  .risk-top-grid-risk,
+  .risk-top-grid-forecast,
+  .risk-top-grid-safe,
+  .risk-bottom-grid-forecast { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 700px) {
   .risk-top-grid,
   .risk-bottom-grid { grid-template-columns: 1fr; }
+
+  .insight-tabs {
+    width: 100%;
+  }
+
+  .insight-tabs a {
+    text-align: center;
+    flex: 1 0 auto;
+  }
 }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import api from '../services/api';
 import type { User } from '../types';
@@ -9,7 +9,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, confirmPassword?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -59,8 +59,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(newUser);
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const { data } = await api.post('/auth/register', { name, email, password });
+  const register = async (name: string, email: string, password: string, confirmPassword?: string) => {
+    const { data } = await api.post('/auth/register', { name, email, password, confirmPassword: confirmPassword ?? password });
     if (!data.success) throw new Error(data.error?.message ?? 'Registration failed');
     const { token: newToken, user: newUser } = data.data;
     localStorage.setItem('wm_token', newToken);

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { TrendingUp, User, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 import './Auth.css';
 
 const RegisterPage: React.FC = () => {
@@ -38,9 +39,9 @@ const RegisterPage: React.FC = () => {
     setLoading(true);
     try {
       await register(name, email, password);
-      navigate('/dashboard');
+      navigate('/onboarding');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+      setError(getApiErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -52,21 +53,21 @@ const RegisterPage: React.FC = () => {
       <div className="auth-left">
         <div className="auth-brand">
           <div className="auth-brand-icon">
-            <TrendingUp size={36} color="#fff" />
+            <img src="/wealthmap-logo.png" alt="WealthMap" />
           </div>
           <h1>WealthMap</h1>
-          <p className="auth-tagline">Your proactive financial co-pilot</p>
+          <p className="auth-tagline">Your student money companion</p>
         </div>
 
         <div className="auth-checklist">
           <p className="auth-checklist-title">What you get with WealthMap:</p>
           {[
-            'Real-time budget vs. spending comparison',
-            'Month-end expense forecasting',
-            'Financial risk score & alerts',
-            'What-If scenario simulator',
-            'AI-powered recommendations',
-            'Financial Dependency Graph',
+            'Balance allowance, stipend and part-time income',
+            'Plan monthly costs for food, travel and books',
+            'Keep rent, fees and bills in view',
+            'See what a big purchase could change',
+            'Get a daily spending guide',
+            'No bank connection required',
           ].map((item) => (
             <div className="auth-checklist-item" key={item}>
               <CheckCircle size={16} color="var(--success)" />
@@ -80,8 +81,8 @@ const RegisterPage: React.FC = () => {
       <div className="auth-right">
         <div className="auth-card neu-raised fade-in">
           <div className="auth-card-header">
-            <h2>Create your account</h2>
-            <p>Start your financial journey with WealthMap</p>
+            <h2>Your money, less stressful.</h2>
+            <p>Create a free account and build a budget around student life.</p>
           </div>
 
           {error && (

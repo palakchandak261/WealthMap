@@ -52,7 +52,7 @@ export const getGoalsService = async (userId: string) => {
 export const updateGoalService = async (
   userId: string,
   id: string,
-  body: Partial<{ name: string; targetAmount: number; deadline: string; status: GoalStatus }>
+  body: Partial<{ name: string; targetAmount: number; currentAmount: number; deadline: string; status: GoalStatus }>
 ) => {
   const existing = await prisma.goal.findFirst({ where: { id, userId } });
   if (!existing) throw notFound();

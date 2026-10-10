@@ -95,48 +95,70 @@ export interface Goal {
 export type RiskLevel = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
 
 export interface FinancialState {
-  income: { monthly: number; ytd: number };
-  budget: { total: number; spent: number; remaining: number; utilizationPct: number };
-  cashFlow: { cashBalance: number; projectedMonthEnd: number };
-  obligations: { total: number; upcoming: Obligation[] };
-  goals: { count: number; totalTarget: number; totalSaved: number };
-  risk: { score: number; level: RiskLevel };
-  healthScore: number;
-  safeToSpend: number;
+  userId: string;
+  month: number;
+  year: number;
+  declaredMonthlyIncome: number;
+  totalIncomeThisMonth: number;
+  cashBalance: number;
+  savingsBalance: number;
+  emergencyFundBalance: number;
+  totalBudget: number;
+  totalSpent: number;
+  totalRemaining: number;
+  overallUtilization: number;
+  categories: FinancialCategoryState[];
+  avgDailySpending: number;
+  daysPassedInMonth: number;
+  daysRemainingInMonth: number;
+  totalDaysInMonth: number;
+  upcomingObligations: Obligation[];
+  totalUpcomingAmount: number;
+  safeSpendableAmount: number;
+  safeDailySpending: number;
+  activeGoals: { id: string; name: string; progress: number; remaining: number }[];
+}
+
+export interface FinancialCategoryState {
+  category: string;
+  budget: number;
+  spent: number;
+  remaining: number;
+  utilization: number;
+  status: 'NORMAL' | 'WARNING' | 'CRITICAL' | 'EXHAUSTED' | 'EXCEEDED';
 }
 
 export interface ForecastResult {
   projectedMonthlyExpense: number;
-  currentSpend: number;
-  daysElapsed: number;
-  daysInMonth: number;
-  avgDailySpend: number;
-  potentialOverrun: number;
-  categories: CategoryForecast[];
-  spendingVelocity: number;
+  currentBudget: number;
+  expectedExcess: number;
+  willExceedBudget: boolean;
+  previousAvgDailySpending: number;
+  currentAvgDailySpending: number;
+  velocityChangePercent: number;
+  categoryForecasts: CategoryForecast[];
 }
 
 export interface CategoryForecast {
   category: string;
+  budget: number;
   spent: number;
-  limit: number;
   projected: number;
-  overrun: number;
-  utilizationPct: number;
-  status: 'NORMAL' | 'WARNING' | 'CRITICAL_WARNING' | 'LIMIT_REACHED' | 'EXCEEDED';
+  expectedExcess: number;
+  willExceed: boolean;
 }
 
 export interface RiskResult {
-  score: number;
-  level: RiskLevel;
-  breakdown: {
-    budget: number;
-    cashFlow: number;
-    obligation: number;
-    velocity: number;
-    goal: number;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  components: {
+    budgetRisk: number;
+    cashFlowRisk: number;
+    obligationRisk: number;
+    velocityRisk: number;
+    goalRisk: number;
   };
-  alerts: RiskAlert[];
+  alerts: string[];
 }
 
 export interface RiskAlert {
@@ -146,23 +168,30 @@ export interface RiskAlert {
 }
 
 export interface HealthScoreResult {
-  overall: number;
-  breakdown: {
-    budgetAdherence: number;
-    cashBuffer: number;
-    obligationCoverage: number;
-    spendingStability: number;
-    savings: number;
-    goalProgress: number;
+  total: number;
+  grade: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR';
+  components: {
+    budgetAdherence: HealthScoreComponent;
+    cashBuffer: HealthScoreComponent;
+    obligationCoverage: HealthScoreComponent;
+    spendingStability: HealthScoreComponent;
+    savingsRate: HealthScoreComponent;
+    goalProgress: HealthScoreComponent;
   };
+  insights: string[];
+}
+
+export interface HealthScoreComponent {
+  score: number;
+  explanation: string;
 }
 
 export interface SafeToSpendResult {
-  safeToSpend: number;
-  remainingBudget: number;
-  obligations: number;
-  buffer: number;
-  daysLeft: number;
+  safeSpendableAmount: number;
+  safeDailySpending: number;
+  daysRemaining: number;
+  budgetRemaining: number;
+  upcomingObligations: number;
 }
 
 export interface DependencyGraph {
@@ -177,26 +206,49 @@ export interface GraphNode {
   type: GraphNodeType;
   label: string;
   value?: number;
-  positionX: number;
-  positionY: number;
+  position: { x: number; y: number };
 }
 
 export interface GraphEdge {
   id: string;
-  sourceNodeId: string;
-  targetNodeId: string;
+  source: string;
+  target: string;
   relationship: string;
   weight: number;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
 
 export interface SimulationResult {
-  current: { balance: number; riskScore: number; healthScore: number; budgetRemaining: number };
-  simulated: { balance: number; riskScore: number; healthScore: number; budgetRemaining: number };
-  delta: { balance: number; riskScore: number; healthScore: number; budgetRemaining: number };
-  affectedGoals: { goalId: string; name: string; impact: string }[];
-  affectedObligations: { obligationId: string; name: string; impact: string }[];
-  warnings: string[];
+  input: { amount: number; category?: string; description?: string };
+  before: {
+    riskScore: number;
+    riskLevel: string;
+    healthScore: number;
+    healthGrade: string;
+    projectedExpense: number;
+    cashBalance: number;
+    safeDaily: number;
+    budgetRemaining: number;
+  };
+  after: {
+    riskScore: number;
+    riskLevel: string;
+    healthScore: number;
+    healthGrade: string;
+    projectedExpense: number;
+    cashBalance: number;
+    safeDaily: number;
+    budgetRemaining: number;
+  };
+  diff: {
+    riskDelta: number;
+    healthDelta: number;
+    cashImpact: number;
+    budgetImpact: number;
+    projectedImpact: number;
+  };
+  verdict: string;
+  safe: boolean;
 }
 
 export interface AnomalyResult {
@@ -213,9 +265,14 @@ export interface Anomaly {
 }
 
 export interface AIRecommendation {
-  summary: string;
   recommendations: string[];
-  priorityActions: string[];
+  context: {
+    riskScore: number;
+    riskLevel: RiskLevel;
+    healthScore: number;
+    healthGrade: string;
+    willExceedBudget: boolean;
+  };
 }
 
 // ── API wrapper types ─────────────────────────────────────────────────────────

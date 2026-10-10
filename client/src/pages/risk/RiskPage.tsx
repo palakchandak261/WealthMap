@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Shield, AlertTriangle, CheckCircle, RefreshCw,
   TrendingUp, TrendingDown, Zap, BarChart2, Activity,
@@ -9,7 +10,7 @@ import {
 } from 'recharts';
 import api from '../../services/api';
 import { formatCurrency, riskLevelColor } from '../../utils/formatters';
-import type { RiskResult, ForecastResult, SafeToSpendResult, HealthScoreResult } from '../../types';
+import type { FinancialState, RiskResult, ForecastResult, SafeToSpendResult, HealthScoreResult } from '../../types';
 import './Risk.css';
 
 const categoryStatusColor = (status: string) => {
@@ -21,34 +22,44 @@ const categoryStatusColor = (status: string) => {
 };
 
 const RiskPage: React.FC = () => {
+  const { pathname } = useLocation();
+  const view = pathname === '/forecast' ? 'forecast' : pathname === '/safe-to-spend' ? 'safe' : 'risk';
+  const pageCopy = {
+    risk: { title: 'Risk overview', description: 'Understand the factors shaping your financial risk and health.' },
+    forecast: { title: 'Spending forecast', description: 'See how your current pace may shape the rest of the month.' },
+    safe: { title: 'Safe to spend', description: 'Plan today’s spending after budgets and upcoming commitments.' },
+  }[view];
   const [risk, setRisk] = useState<RiskResult | null>(null);
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
+  const [financialState, setFinancialState] = useState<FinancialState | null>(null);
   const [safeToSpend, setSafeToSpend] = useState<SafeToSpendResult | null>(null);
   const [health, setHealth] = useState<HealthScoreResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [r, f, s, h] = await Promise.all([
+      const [r, f, s, h, state] = await Promise.all([
         api.get('/engine/risk'),
         api.get('/engine/forecast'),
         api.get('/engine/safe-to-spend'),
         api.get('/engine/health-score'),
+        api.get('/engine/financial-state'),
       ]);
       setRisk(r.data.data);
       setForecast(f.data.data);
       setSafeToSpend(s.data.data);
       setHealth(h.data.data);
+      setFinancialState(state.data.data);
     } catch {
       setError('Failed to load risk data. Make sure the backend is running.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { void fetchAll(); }, [fetchAll]);
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '1rem' }}>
@@ -65,29 +76,27 @@ const RiskPage: React.FC = () => {
     </div>
   );
 
-  const riskColor = riskLevelColor(risk?.level ?? 'LOW');
-  const riskScore = risk?.score ?? 0;
-
-  // Radial gauge data
-  const gaugeData = [{ value: riskScore, fill: riskColor }];
+  const riskColor = riskLevelColor(risk?.riskLevel ?? 'LOW');
+  const riskScore = risk?.riskScore ?? 0;
+  const activeAlerts = (risk?.alerts ?? []).filter((alert) => !alert.startsWith('✅'));
 
   // Risk breakdown bar data
-  const breakdownData = risk?.breakdown ? [
-    { name: 'Budget', value: risk.breakdown.budget, fill: '#7B8CDE' },
-    { name: 'Cash Flow', value: risk.breakdown.cashFlow, fill: '#4ECDC4' },
-    { name: 'Obligations', value: risk.breakdown.obligation, fill: '#FFB347' },
-    { name: 'Velocity', value: risk.breakdown.velocity, fill: '#FF6B6B' },
-    { name: 'Goals', value: risk.breakdown.goal, fill: '#A5B4FC' },
+  const breakdownData = risk?.components ? [
+    { name: 'Budget', value: risk.components.budgetRisk, fill: 'var(--primary-500)' },
+    { name: 'Cash Flow', value: risk.components.cashFlowRisk, fill: 'var(--success)' },
+    { name: 'Obligations', value: risk.components.obligationRisk, fill: 'var(--warning)' },
+    { name: 'Velocity', value: risk.components.velocityRisk, fill: 'var(--danger)' },
+    { name: 'Goals', value: risk.components.goalRisk, fill: 'var(--primary-300)' },
   ] : [];
 
   // Health breakdown bars
-  const healthData = health?.breakdown ? [
-    { name: 'Budget', value: health.breakdown.budgetAdherence },
-    { name: 'Cash', value: health.breakdown.cashBuffer },
-    { name: 'Obligations', value: health.breakdown.obligationCoverage },
-    { name: 'Stability', value: health.breakdown.spendingStability },
-    { name: 'Savings', value: health.breakdown.savings },
-    { name: 'Goals', value: health.breakdown.goalProgress },
+  const healthData = health?.components ? [
+    { name: 'Budget', value: health.components.budgetAdherence.score },
+    { name: 'Cash', value: health.components.cashBuffer.score },
+    { name: 'Obligations', value: health.components.obligationCoverage.score },
+    { name: 'Stability', value: health.components.spendingStability.score },
+    { name: 'Savings', value: health.components.savingsRate.score },
+    { name: 'Goals', value: health.components.goalProgress.score },
   ] : [];
 
   return (
@@ -96,8 +105,8 @@ const RiskPage: React.FC = () => {
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <h1>Risk & Forecast</h1>
-            <p>Your financial risk profile, forecast, and safe-to-spend analysis</p>
+            <h1>{pageCopy.title}</h1>
+            <p>{pageCopy.description}</p>
           </div>
           <button className="btn btn-secondary btn-sm" onClick={fetchAll}>
             <RefreshCw size={14} /> Refresh
@@ -105,11 +114,15 @@ const RiskPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Top row: Risk Gauge + Safe to Spend + Forecast */}
-      <div className="risk-top-grid">
+      <nav className="insight-tabs" aria-label="Financial insights">
+        <NavLink to="/forecast">Forecast</NavLink>
+        <NavLink to="/risk">Risk</NavLink>
+        <NavLink to="/safe-to-spend">Safe to spend</NavLink>
+      </nav>
 
+      <div className={`risk-top-grid risk-top-grid-${view}`}>
         {/* Risk Score Gauge */}
-        <div className="neu-raised risk-gauge-card fade-in">
+        {view === 'risk' && <div className="neu-raised risk-gauge-card fade-in">
           <div className="card-header-plain">
             <Shield size={18} color={riskColor} />
             <h3>Risk Score</h3>
@@ -128,8 +141,8 @@ const RiskPage: React.FC = () => {
             <div className="risk-gauge-center">
               <div className="risk-score-number" style={{ color: riskColor }}>{riskScore}</div>
               <div className="risk-score-label">out of 100</div>
-              <div className={`risk-level-badge risk-level-${risk?.level?.toLowerCase()}`}>
-                {risk?.level ?? 'LOW'}
+              <div className={`risk-level-badge risk-level-${risk?.riskLevel?.toLowerCase()}`}>
+                {risk?.riskLevel ?? 'LOW'}
               </div>
             </div>
           </div>
@@ -139,47 +152,47 @@ const RiskPage: React.FC = () => {
             <span style={{ color: 'var(--danger-dark)' }}>High</span>
             <span style={{ color: 'var(--critical)' }}>Critical</span>
           </div>
-        </div>
+        </div>}
 
         {/* Safe to Spend */}
-        <div className="neu-raised safe-spend-card fade-in">
+        {view === 'safe' && <div className="neu-raised safe-spend-card fade-in">
           <div className="card-header-plain">
             <Zap size={18} color="var(--warning-dark)" />
             <h3>Safe to Spend Today</h3>
           </div>
           {safeToSpend && (
             <div className="safe-spend-content">
-              <div className="safe-spend-amount">{formatCurrency(safeToSpend.safeToSpend)}</div>
+              <div className="safe-spend-amount">{formatCurrency(safeToSpend.safeDailySpending)}</div>
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>per day recommended</p>
               <div className="safe-spend-breakdown">
                 <div className="safe-row">
                   <span className="text-muted">Remaining Budget</span>
-                  <span style={{ fontWeight: 600 }}>{formatCurrency(safeToSpend.remainingBudget)}</span>
+                  <span style={{ fontWeight: 600 }}>{formatCurrency(safeToSpend.budgetRemaining)}</span>
                 </div>
                 <div className="safe-row">
                   <span className="text-muted">Obligations (upcoming)</span>
                   <span style={{ color: 'var(--danger-dark)', fontWeight: 600 }}>
-                    − {formatCurrency(safeToSpend.obligations)}
+                    − {formatCurrency(safeToSpend.upcomingObligations)}
                   </span>
                 </div>
                 <div className="safe-row">
-                  <span className="text-muted">Safety Buffer</span>
-                  <span style={{ color: 'var(--warning-dark)', fontWeight: 600 }}>
-                    − {formatCurrency(safeToSpend.buffer)}
+                  <span className="text-muted">Safe amount for the rest of this month</span>
+                  <span style={{ color: 'var(--success-dark)', fontWeight: 600 }}>
+                    {formatCurrency(safeToSpend.safeSpendableAmount)}
                   </span>
                 </div>
                 <div className="divider" style={{ margin: '0.5rem 0' }} />
                 <div className="safe-row">
                   <span className="text-muted">Days Remaining</span>
-                  <span style={{ fontWeight: 700 }}>{safeToSpend.daysLeft}</span>
+                  <span style={{ fontWeight: 700 }}>{safeToSpend.daysRemaining}</span>
                 </div>
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Month-End Forecast */}
-        <div className="neu-raised forecast-card fade-in">
+        {view === 'forecast' && <div className="neu-raised forecast-card fade-in">
           <div className="card-header-plain">
             <TrendingUp size={18} color="var(--primary-500)" />
             <h3>Month-End Forecast</h3>
@@ -193,28 +206,28 @@ const RiskPage: React.FC = () => {
               <div className="forecast-meta-grid">
                 <div className="forecast-meta-item">
                   <span className="text-muted" style={{ fontSize: '0.75rem' }}>Current Spend</span>
-                  <span style={{ fontWeight: 700 }}>{formatCurrency(forecast.currentSpend)}</span>
+                  <span style={{ fontWeight: 700 }}>{formatCurrency(financialState?.totalSpent ?? 0)}</span>
                 </div>
                 <div className="forecast-meta-item">
                   <span className="text-muted" style={{ fontSize: '0.75rem' }}>Avg Daily</span>
-                  <span style={{ fontWeight: 700 }}>{formatCurrency(forecast.avgDailySpend)}</span>
+                  <span style={{ fontWeight: 700 }}>{formatCurrency(financialState?.avgDailySpending ?? 0)}</span>
                 </div>
                 <div className="forecast-meta-item">
                   <span className="text-muted" style={{ fontSize: '0.75rem' }}>Days Left</span>
-                  <span style={{ fontWeight: 700 }}>{forecast.daysInMonth - forecast.daysElapsed}</span>
+                  <span style={{ fontWeight: 700 }}>{financialState?.daysRemainingInMonth ?? 0}</span>
                 </div>
                 <div className="forecast-meta-item">
                   <span className="text-muted" style={{ fontSize: '0.75rem' }}>Velocity</span>
-                  <span style={{ fontWeight: 700, color: forecast.spendingVelocity > 1 ? 'var(--danger-dark)' : 'var(--success-dark)' }}>
-                    {forecast.spendingVelocity > 1 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                    {forecast.spendingVelocity.toFixed(2)}x
+                  <span style={{ fontWeight: 700, color: forecast.velocityChangePercent > 0 ? 'var(--danger-dark)' : 'var(--success-dark)' }}>
+                    {forecast.velocityChangePercent > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    {forecast.velocityChangePercent > 0 ? '+' : ''}{forecast.velocityChangePercent}%
                   </span>
                 </div>
               </div>
-              {forecast.potentialOverrun > 0 ? (
+              {forecast.expectedExcess > 0 ? (
                 <div className="alert-bar alert-bar-danger" style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
                   <AlertTriangle size={15} />
-                  Projected overrun of {formatCurrency(forecast.potentialOverrun)}
+                  Projected overrun of {formatCurrency(forecast.expectedExcess)}
                 </div>
               ) : (
                 <div className="alert-bar alert-bar-success" style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
@@ -224,48 +237,41 @@ const RiskPage: React.FC = () => {
               )}
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
-      {/* Second row: Alerts + Risk Breakdown Chart */}
-      <div className="risk-bottom-grid">
+      {view !== 'safe' && <div className={`risk-bottom-grid risk-bottom-grid-${view}`}>
 
         {/* Risk Alerts */}
-        <div className="neu-raised risk-alerts-card fade-in">
+        {view === 'risk' && <div className="neu-raised risk-alerts-card fade-in">
           <div className="card-header-plain">
             <AlertTriangle size={18} color="var(--warning-dark)" />
-            <h3>Active Alerts <span className="badge badge-danger" style={{ marginLeft: '0.5rem' }}>{risk?.alerts?.length ?? 0}</span></h3>
+            <h3>Active Alerts <span className="badge badge-danger" style={{ marginLeft: '0.5rem' }}>{activeAlerts.length}</span></h3>
           </div>
           <div className="alerts-scroll">
-            {(risk?.alerts ?? []).length === 0 ? (
+            {activeAlerts.length === 0 ? (
               <div className="alert-bar alert-bar-success">
                 <CheckCircle size={16} /> All clear — no risk alerts!
               </div>
             ) : (
-              risk?.alerts.map((alert, i) => (
+              activeAlerts.map((alert, i) => (
                 <div
                   key={i}
-                  className={`alert-bar alert-bar-${
-                    alert.severity === 'CRITICAL' ? 'critical'
-                    : alert.severity === 'HIGH' ? 'danger'
-                    : alert.severity === 'MEDIUM' ? 'warning'
-                    : 'primary'
-                  }`}
+                  className={`alert-bar alert-bar-${alert.startsWith('🔴') ? 'danger' : alert.startsWith('⚠️') ? 'warning' : 'primary'}`}
                   style={{ marginBottom: '0.5rem' }}
                 >
                   <AlertTriangle size={14} />
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.8rem' }}>{alert.type}</div>
-                    <div style={{ fontSize: '0.82rem' }}>{alert.message}</div>
+                    <div style={{ fontSize: '0.82rem' }}>{alert}</div>
                   </div>
                 </div>
               ))
             )}
           </div>
-        </div>
+        </div>}
 
         {/* Risk Breakdown Chart */}
-        <div className="neu-raised risk-breakdown-card fade-in">
+        {view === 'risk' && <div className="neu-raised risk-breakdown-card fade-in">
           <div className="card-header-plain">
             <Activity size={18} color="var(--primary-500)" />
             <h3>Risk Breakdown</h3>
@@ -275,7 +281,7 @@ const RiskPage: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--bg-subtle)" />
               <XAxis type="number" domain={[0, 30]} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
               <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} width={80} />
-              <Tooltip formatter={(v: number) => [`${v} pts`, 'Score']} />
+              <Tooltip formatter={(value) => [`${value ?? 0} pts`, 'Score']} />
               <Bar dataKey="value" radius={[0, 6, 6, 0]}>
                 {breakdownData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} />
@@ -283,10 +289,10 @@ const RiskPage: React.FC = () => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </div>}
 
         {/* Health Score Breakdown */}
-        <div className="neu-raised risk-health-card fade-in">
+        {view === 'risk' && <div className="neu-raised risk-health-card fade-in">
           <div className="card-header-plain">
             <BarChart2 size={18} color="var(--success-dark)" />
             <h3>Health Score Breakdown</h3>
@@ -312,15 +318,15 @@ const RiskPage: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* Category Forecast Table */}
-        <div className="neu-raised risk-cat-card fade-in" style={{ gridColumn: '1 / -1' }}>
+        {view === 'forecast' && <div className="neu-raised risk-cat-card fade-in">
           <div className="card-header-plain" style={{ marginBottom: '1rem' }}>
             <BarChart2 size={18} color="var(--primary-500)" />
             <h3>Category Forecast</h3>
           </div>
-          {(forecast?.categories ?? []).length === 0 ? (
+          {(forecast?.categoryForecasts ?? []).length === 0 ? (
             <p className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>
               No category data. Set up a budget with categories first.
             </p>
@@ -338,31 +344,33 @@ const RiskPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {forecast?.categories.map((cat, i) => {
-                    const color = categoryStatusColor(cat.status);
+                  {forecast?.categoryForecasts.map((cat, i) => {
+                    const utilization = cat.budget > 0 ? (cat.spent / cat.budget) * 100 : 0;
+                    const status = cat.willExceed ? 'EXCEEDED' : utilization >= 80 ? 'WARNING' : 'NORMAL';
+                    const color = categoryStatusColor(status);
                     return (
                       <tr key={i}>
                         <td><strong>{cat.category}</strong></td>
                         <td>{formatCurrency(cat.spent)}</td>
-                        <td>{formatCurrency(cat.limit)}</td>
+                        <td>{formatCurrency(cat.budget)}</td>
                         <td style={{ fontWeight: 700, color }}>{formatCurrency(cat.projected)}</td>
                         <td style={{ width: 140 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <div className="progress-bar-wrap" style={{ flex: 1 }}>
                               <div
                                 className="progress-bar-fill"
-                                style={{ width: `${Math.min(100, cat.utilizationPct)}%`, background: color }}
+                                style={{ width: `${Math.min(100, utilization)}%`, background: color }}
                               />
                             </div>
-                            <span style={{ fontSize: '0.75rem', color }}>{cat.utilizationPct.toFixed(0)}%</span>
+                            <span style={{ fontSize: '0.75rem', color }}>{utilization.toFixed(0)}%</span>
                           </div>
                         </td>
                         <td>
                           <span className={`badge ${
-                            cat.status === 'EXCEEDED' || cat.status === 'LIMIT_REACHED' ? 'badge-danger'
-                            : cat.status.includes('WARNING') ? 'badge-warning'
+                            status === 'EXCEEDED' ? 'badge-danger'
+                            : status.includes('WARNING') ? 'badge-warning'
                             : 'badge-success'
-                          }`}>{cat.status.replace('_', ' ')}</span>
+                          }`}>{status.replace('_', ' ')}</span>
                         </td>
                       </tr>
                     );
@@ -371,8 +379,8 @@ const RiskPage: React.FC = () => {
               </table>
             </div>
           )}
-        </div>
-      </div>
+        </div>}
+      </div>}
     </div>
   );
 };
