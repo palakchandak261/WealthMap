@@ -93,6 +93,11 @@ model User {
   emergencyFundBalance Decimal  @default(0) @db.Decimal(14, 2)
   declaredMonthlyIncome Decimal @default(0) @db.Decimal(14, 2)
   onboardingComplete   Boolean  @default(false)
+  emailVerified        Boolean  @default(false)
+  verifyToken          String?
+  verifyTokenExpiry    DateTime?
+  resetToken           String?
+  resetTokenExpiry     DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

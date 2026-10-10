@@ -60,10 +60,10 @@ export const getRecommendationsService = async (
   risk:     RiskResult,
   health:   HealthScoreBreakdown
 ): Promise<{ recommendations: string[]; rawResponse: string }> => {
-  const apiKey = process.env.LLM_API_KEY;
+  const apiKey = process.env.LLM_API_KEY?.trim();
 
   // If no API key, return rule-based fallback so the app still works
-  if (!apiKey || apiKey === "replace-with-openai-or-gemini-key") {
+  if (!apiKey || /^(your|replace-with|<)/i.test(apiKey)) {
     return buildFallbackRecommendations(state, forecast, risk);
   }
 

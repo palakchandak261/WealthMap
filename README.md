@@ -6,32 +6,37 @@
 
 ### Prerequisites
 - Node.js v18+
-- MySQL 8+
+- Docker Desktop (recommended for the local MySQL database), or MySQL 8+
 - npm or yarn
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/palakchandak261/WealthMap.git
-cd WealthMap
-```
-
-### 2. Setup the backend
+### 1. Configure the backend
 ```bash
 cd server
 npm install
-cp .env.example .env        # fill in your DB credentials + LLM API key
-npx prisma migrate dev      # run database migrations
-npx prisma generate         # generate Prisma client
-npm run dev                 # starts on http://localhost:5000
+cp .env.example .env
 ```
+Set a private `JWT_SECRET` in `server/.env`. For Docker Desktop, keep the same local-only database password in `DATABASE_URL` and `MYSQL_ROOT_PASSWORD`.
 
-### 3. Setup the frontend
+### 2. Start MySQL and initialize the schema
 ```bash
-cd client
-npm install
-cp .env.example .env        # set VITE_API_URL=http://localhost:5000
-npm run dev                 # starts on http://localhost:5173
+npm run db:start
+npm run db:push
 ```
+The database container publishes only to `127.0.0.1` and keeps data in a named Docker volume.
+
+### 3. Run the backend and frontend
+In one terminal, from `server`:
+```bash
+npm run dev
+```
+In another terminal, from `client`:
+```bash
+npm install
+npm run dev
+```
+Open the URL printed by Vite (normally `http://localhost:5173`). The client API defaults to `http://localhost:5000/api/v1`; set `VITE_API_URL` in `client/.env` only if your backend uses a different URL. For localhost development the API accepts both `localhost` and `127.0.0.1` origins.
+
+The first sign-up sets up a student profile. Use monthly allowance, scholarship, stipend or part-time income, then add money available and savings. You can add campus spending such as food, travel, books, rent and fees after setup.
 
 ---
 
@@ -1945,5 +1950,4 @@ See [`docs/TEAM_WORKFLOW.md`](./docs/TEAM_WORKFLOW.md) for the complete guide on
 ## 📄 License
 
 MIT License — see [LICENSE](./LICENSE)
-
 

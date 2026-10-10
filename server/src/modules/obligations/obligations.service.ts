@@ -64,6 +64,7 @@ export const updateObligationService = async (
     dueDate: string;
     frequency: Frequency;
     isRecurring: boolean;
+    isPaid: boolean;
   }>
 ) => {
   const existing = await prisma.obligation.findFirst({ where: { id, userId } });
