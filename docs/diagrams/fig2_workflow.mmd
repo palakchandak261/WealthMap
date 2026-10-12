@@ -1,0 +1,26 @@
+flowchart TD
+    START([User Transaction / Input]) --> VAL[Zod Validation & JWT Auth]
+    VAL --> DB[(Commit to MySQL via Prisma)]
+    DB --> CHECK{Request Type?}
+
+    %% Pipeline A: Core Evaluation
+    CHECK -->|Standard Event| STATE[1. Compute Financial State & Health Score]
+    STATE --> VEL[2. Calculate Expense Velocity & Run-Rate]
+    VEL --> RISK[3. Calculate Composite Risk Score 0-100]
+    RISK --> DAG[4. Traverse Dependency DAG & Assign Edge Severity]
+    DAG --> COND{Risk >= 60 OR<br/>Safe-to-Spend Critical?}
+    COND -->|Yes| ALERT[Emit Shortfall Warning & Cap Daily Budget]
+    COND -->|No| NORMAL[Emit Balanced Financial Status]
+    ALERT & NORMAL --> AICAP[Serialize State to Prompt Context]
+    AICAP --> LLM[LLM Synthesizes Actionable Advisory]
+
+    %% Pipeline B: What-If Simulation
+    CHECK -->|Simulation Query| CLONE[1. In-Memory Deep Clone of Committed State]
+    CLONE --> INJECT[2. Apply Hypothetical Perturbation<br/>Zero DB Mutation]
+    INJECT --> RECALC[3. Re-Evaluate Health, Risk & Runway]
+    RECALC --> DELTA[4. Generate Delta Matrix<br/>ΔHealth, ΔRisk, ΔRunway]
+
+    %% Convergence
+    LLM --> UI[Render Dashboard, React Flow DAG & Advisory Cards]
+    DELTA --> UI
+    UI --> END([Actionable Decision Support Delivered])

@@ -1,0 +1,115 @@
+erDiagram
+    USERS ||--o{ INCOMES : "earns"
+    USERS ||--o{ EXPENSES : "spends"
+    USERS ||--o{ BUDGETS : "defines"
+    BUDGETS ||--|{ CATEGORY_BUDGETS : "allocates"
+    USERS ||--o{ OBLIGATIONS : "commits_to"
+    USERS ||--o{ GOALS : "aims_for"
+    USERS ||--o{ PREDICTIONS : "receives"
+    USERS ||--o{ RISK_LOGS : "logs"
+    USERS ||--o{ GRAPH_NODES : "owns"
+    GRAPH_NODES ||--o{ GRAPH_EDGES : "source_node"
+    GRAPH_NODES ||--o{ GRAPH_EDGES : "target_node"
+
+    USERS {
+        string id PK
+        string email UK
+        string passwordHash
+        decimal cashBalance
+        decimal savingsBalance
+        decimal emergencyFundBalance
+        decimal declaredMonthlyIncome
+        boolean onboardingComplete
+        string otpCode
+        datetime otpExpiry
+    }
+
+    INCOMES {
+        string id PK
+        string userId FK
+        string source
+        decimal amount
+        string frequency
+        datetime receivedAt
+    }
+
+    EXPENSES {
+        string id PK
+        string userId FK
+        string category
+        decimal amount
+        string paymentMethod
+        datetime spentAt
+    }
+
+    BUDGETS {
+        string id PK
+        string userId FK
+        int month
+        int year
+        decimal totalBudget
+    }
+
+    CATEGORY_BUDGETS {
+        string id PK
+        string budgetId FK
+        string category
+        decimal limit
+    }
+
+    OBLIGATIONS {
+        string id PK
+        string userId FK
+        string name
+        string type
+        decimal amount
+        datetime dueDate
+        boolean isPaid
+    }
+
+    GOALS {
+        string id PK
+        string userId FK
+        string name
+        decimal targetAmount
+        decimal currentAmount
+        datetime deadline
+    }
+
+    PREDICTIONS {
+        string id PK
+        string userId FK
+        string type
+        json resultJson
+        datetime generatedAt
+    }
+
+    RISK_LOGS {
+        string id PK
+        string userId FK
+        int riskScore
+        string riskLevel
+        int budgetRisk
+        int cashFlowRisk
+        int obligationRisk
+        int velocityRisk
+    }
+
+    GRAPH_NODES {
+        string id PK
+        string userId FK
+        string type
+        string label
+        decimal value
+        float positionX
+        float positionY
+    }
+
+    GRAPH_EDGES {
+        string id PK
+        string sourceNodeId FK
+        string targetNodeId FK
+        string relationship
+        float weight
+        string severity
+    }

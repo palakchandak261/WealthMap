@@ -1,0 +1,40 @@
+graph TB
+    subgraph PresentationLayer["Presentation Layer (Client)"]
+        UI["React 19 + Vite SPA"]
+        VIZ["React Flow (DAG) & Recharts"]
+        HTTP["Axios Client (JWT Interceptor)"]
+        UI --- VIZ
+        UI --- HTTP
+    end
+
+    subgraph GatewayLayer["API Gateway & Middleware Layer"]
+        ROUTER["Express.js Router (/api/v1)"]
+        SEC["JWT Guard | Zod Validator | Rate Limiter | CORS"]
+        ROUTER --- SEC
+    end
+
+    subgraph CoreLayer["Deterministic Business Engine Layer (Zero-Hallucination)"]
+        STATE["Financial State Engine<br/>(Health Score 0-100)"]
+        FORECAST["Forecasting Engine<br/>(Spending Velocity & Burn Rate)"]
+        RISK["Risk Engine<br/>(Multi-Factor Score 0-100)"]
+        GRAPH["Dependency DAG Engine<br/>(Severity & Edge Weighting)"]
+        SIM["What-If Simulation Sandbox<br/>(In-Memory Delta Matrix)"]
+    end
+
+    subgraph AILayer["Generative AI Advisory Layer"]
+        SYNTH["Context Serializer<br/>(Pre-Computed Metrics Only)"]
+        LLM["LLM Gateway<br/>(OpenAI / Gemini)"]
+        SYNTH --> LLM
+    end
+
+    subgraph PersistenceLayer["Data Persistence Layer"]
+        PRISMA["Prisma ORM Client"]
+        MYSQL[("MySQL Database (InnoDB)<br/>12 Normalized Tables")]
+        PRISMA --- MYSQL
+    end
+
+    HTTP ==>|REST / HTTPS| ROUTER
+    SEC ==> STATE & FORECAST & RISK & GRAPH & SIM
+    RISK & STATE & FORECAST ==>|Pre-Computed JSON| SYNTH
+    LLM -.->|Advisory Response| ROUTER
+    STATE & RISK & GRAPH & SIM <==>|Type-Safe Queries| PRISMA

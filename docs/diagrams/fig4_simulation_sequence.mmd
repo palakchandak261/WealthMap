@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    actor User as Student
+    participant UI as Client (React UI)
+    participant API as API Router (Express)
+    participant SIM as Simulation Engine
+    participant MATH as Deterministic Math Engines
+    participant DB as MySQL DB (Prisma)
+
+    User->>UI: Enter Scenario: Purchase ₹45,000 (Laptop)
+    UI->>API: POST /api/v1/engine/simulate (Scenario Payload)
+    Note over API: Zod Validation & JWT Auth
+    API->>SIM: runSimulation(userId, scenario)
+    
+    SIM->>DB: Fetch Baseline Snapshot (Cash, Budgets, Obligations)
+    DB-->>SIM: Return Committed Database State
+    
+    rect rgb(240, 245, 255)
+        Note over SIM: In-Memory Deep Clone<br/>Zero Database Mutation
+        SIM->>SIM: stateClone = structuredClone(baseline)
+        SIM->>SIM: Inject Perturbation (Cash - ₹45,000)
+        SIM->>MATH: evaluateStateAndRisk(stateClone)
+        MATH-->>SIM: Return Simulated (Health', Risk', Runway')
+        SIM->>SIM: Compute Delta Matrix (ΔHealth, ΔRisk, ΔRunway)
+    end
+
+    SIM-->>API: Return { baseline, simulated, deltaMatrix }
+    API-->>UI: HTTP 200 OK (Simulation Response)
+    UI->>UI: Render Before vs After Cards & Delta Matrix
+    UI-->>User: Displays Financial Impact (Runway -28 Days, Risk +22)
