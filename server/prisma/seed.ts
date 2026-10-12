@@ -28,8 +28,8 @@ async function main() {
     data: {
       name: 'Demo User',
       email: 'demo@wealthmap.app',
-      // bcrypt hash of "Demo@1234" — replace before real auth testing
-      passwordHash: '$2b$12$KIXjH0n/V4V.yRZ8PQGIKeO0aTCMXSEXzRvMq3XcRAn4L5BW5Ky9S',
+      // bcrypt hash of "Demo@1234"
+      passwordHash: '$2a$12$DF3subn.iol3eNpmxCn.9eg1lrJr3Q4cfjPDw4ja58E1w6uV1unem',
       currency: 'INR',
       cashBalance: '85000.00',
       savingsBalance: '150000.00',

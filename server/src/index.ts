@@ -18,32 +18,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT ?? 5000;
 
-const configuredOrigins = (process.env.CLIENT_URL ?? "http://localhost:5173")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-const allowedOrigins = new Set(configuredOrigins);
-
-if (process.env.NODE_ENV !== "production") {
-  for (const origin of configuredOrigins) {
-    try {
-      const localOrigin = new URL(origin);
-      if (localOrigin.hostname === "localhost" || localOrigin.hostname === "127.0.0.1") {
-        localOrigin.hostname = localOrigin.hostname === "localhost" ? "127.0.0.1" : "localhost";
-        allowedOrigins.add(localOrigin.origin);
-      }
-    } catch {
-      console.warn(`Ignoring invalid CLIENT_URL origin: ${origin}`);
-    }
-  }
-}
-
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-    return callback(new Error("Origin is not allowed by CORS"));
-  },
+  origin: true,
   credentials: true,
 }));
 app.use(express.json());
