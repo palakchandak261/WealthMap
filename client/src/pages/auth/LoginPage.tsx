@@ -1,17 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, Sparkles } from 'lucide-react';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 import api from '../../services/api';
+import { INITIAL_DEMO_USER, resetMockStore } from '../../services/mockData';
 import './Auth.css';
 
 // Google reCAPTCHA v2 test site key (always passes in dev — replace with real key in production)
 const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
 const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, setAuthData } = useAuth();
   const navigate = useNavigate();
   const captchaRef = useRef<ReCAPTCHA>(null);
 
@@ -59,6 +60,15 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleDemoAccess = () => {
+    resetMockStore();
+    localStorage.setItem('wm_demo_mode', 'true');
+    localStorage.setItem('wm_token', 'mock-demo-jwt-token-wealthmap');
+    localStorage.setItem('wm_user', JSON.stringify(INITIAL_DEMO_USER));
+    setAuthData('mock-demo-jwt-token-wealthmap', INITIAL_DEMO_USER);
+    navigate('/dashboard');
+  };
+
   return (
     <div className="auth-page">
       {/* Left panel — brand illustration */}
@@ -68,15 +78,15 @@ const LoginPage: React.FC = () => {
             <img src="/wealthmap-logo.png" alt="WealthMap" />
           </div>
           <h1>WealthMap</h1>
-          <p className="auth-tagline">Your student money companion</p>
+          <p className="auth-tagline">Your intelligent financial companion</p>
         </div>
 
         <div className="auth-features">
           {[
-            { emoji: '📊', title: 'Campus-life budgets', desc: 'Plan for food, travel, books and more' },
-            { emoji: '🔮', title: 'Know what\'s coming', desc: 'See if your money can last the month' },
-            { emoji: '⚡', title: 'Try a what-if', desc: 'Check a purchase before committing' },
-            { emoji: '🤖', title: 'Clear next steps', desc: 'Get useful insights from your own numbers' },
+            { emoji: '📊', title: 'Inflation-Aware Goals', desc: 'Real purchasing power and future costs calculated' },
+            { emoji: '🛡️', title: 'Safe-To-Spend Tracking', desc: 'Positive feedback & appreciation when you spend safely' },
+            { emoji: '📁', title: 'Excel & CSV Importer', desc: 'Upload spreadsheet expenses with instant auto-parsing' },
+            { emoji: '🤖', title: 'AI Financial Advisor', desc: 'Actionable monthly saving recommendations powered by AI' },
           ].map((f) => (
             <div className="auth-feature-card" key={f.title}>
               <span className="auth-feature-icon">{f.emoji}</span>
@@ -93,8 +103,36 @@ const LoginPage: React.FC = () => {
       <div className="auth-right">
         <div className="auth-card neu-raised fade-in">
           <div className="auth-card-header">
-            <h2>Welcome back</h2>
-            <p>Pick up where you left off with your student budget.</p>
+            <h2>Welcome to WealthMap</h2>
+            <p>Sign in to your account or jump into the interactive demo.</p>
+          </div>
+
+          {/* Quick Demo Mode Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(47, 167, 122, 0.12), rgba(23, 110, 83, 0.08))',
+            border: '1px solid var(--primary-300)',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-700)', fontWeight: 600, fontSize: '0.9rem' }}>
+              <Sparkles size={16} /> Instant Demo Presentation
+            </div>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Explore all features with complete mock data, inflation calculations, safe-to-spend appreciation, and CSV upload!
+            </p>
+            <button
+              type="button"
+              id="btn-demo-login"
+              className="btn btn-primary btn-sm"
+              style={{ alignSelf: 'flex-start', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              onClick={handleDemoAccess}
+            >
+              <Sparkles size={14} /> Launch Demo Workspace
+            </button>
           </div>
 
           {error && (
@@ -111,7 +149,7 @@ const LoginPage: React.FC = () => {
                 <input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="demo@wealthmap.app"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
@@ -127,7 +165,7 @@ const LoginPage: React.FC = () => {
                   <input
                     id="password"
                     type={showPw ? 'text' : 'password'}
-                    placeholder="Enter your password"
+                    placeholder="Enter password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"

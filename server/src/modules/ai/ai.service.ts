@@ -18,10 +18,11 @@ const buildClient = () =>
 
 // ── Build a compact financial context string for the LLM ─────────────────────
 const buildContext = (
-  state:    FinancialState,
-  forecast: ForecastResult,
-  risk:     RiskResult,
-  health:   HealthScoreBreakdown
+  state:      FinancialState,
+  forecast:   ForecastResult,
+  risk:       RiskResult,
+  health:     HealthScoreBreakdown,
+  userPrompt?: string
 ): string => `
 FINANCIAL SNAPSHOT (${state.month}/${state.year})
 - Monthly income: ₹${state.declaredMonthlyIncome.toLocaleString("en-IN")}
@@ -29,6 +30,13 @@ FINANCIAL SNAPSHOT (${state.month}/${state.year})
 - Cash balance: ₹${state.cashBalance.toLocaleString("en-IN")}
 - Upcoming obligations: ₹${state.totalUpcomingAmount.toLocaleString("en-IN")}
 - Safe to spend today: ₹${state.safeDailySpending.toLocaleString("en-IN")}/day
+- Actual daily spending: ₹${state.avgDailySpending.toLocaleString("en-IN")}/day (${state.avgDailySpending <= state.safeDailySpending ? "DISCIPLINED: SPENDING UNDER SAFE LIMIT" : "EXCEEDED SAFE LIMIT"})
+- Safe spendable discretionary surplus: ₹${state.safeSpendableAmount.toLocaleString("en-IN")}
+
+ACTIVE GOALS & SAVINGS TARGETS
+${state.activeGoals.length > 0
+  ? state.activeGoals.map((g) => `- ${g.name}: ${g.progress}% achieved (Remaining: ₹${g.remaining.toLocaleString("en-IN")})`).join("\n")
+  : "- None"}
 
 FORECAST
 - Projected month-end expense: ₹${forecast.projectedMonthlyExpense.toLocaleString("en-IN")}
@@ -51,24 +59,27 @@ ${forecast.categoryForecasts
   .filter((c) => c.willExceed)
   .map((c) => `- ${c.category}: projected ₹${c.projected.toLocaleString("en-IN")} vs budget ₹${c.budget.toLocaleString("en-IN")} (excess ₹${c.expectedExcess.toLocaleString("en-IN")})`)
   .join("\n") || "- None"}
+
+USER SPECIFIC QUERY: ${userPrompt || "General financial and goal advice"}
 `.trim();
 
 // ── Main service function ─────────────────────────────────────────────────────
 export const getRecommendationsService = async (
-  state:    FinancialState,
-  forecast: ForecastResult,
-  risk:     RiskResult,
-  health:   HealthScoreBreakdown
+  state:       FinancialState,
+  forecast:    ForecastResult,
+  risk:        RiskResult,
+  health:      HealthScoreBreakdown,
+  userPrompt?: string
 ): Promise<{ recommendations: string[]; rawResponse: string }> => {
   const apiKey = process.env.LLM_API_KEY?.trim();
 
   // If no API key, return rule-based fallback so the app still works
   if (!apiKey || /^(your|replace-with|<)/i.test(apiKey)) {
-    return buildFallbackRecommendations(state, forecast, risk);
+    return buildFallbackRecommendations(state, forecast, risk, userPrompt);
   }
 
   const client  = buildClient();
-  const context = buildContext(state, forecast, risk, health);
+  const context = buildContext(state, forecast, risk, health, userPrompt);
 
   const response = await client.chat.completions.create({
     model: process.env.LLM_MODEL ?? "gpt-4o-mini",
@@ -77,9 +88,10 @@ export const getRecommendationsService = async (
         role: "system",
         content:
           "You are a personal finance assistant. The user's financial data has already been analysed by calculation engines. " +
-          "Your job is to explain the situation clearly and give 3 concise, actionable recommendations. " +
-          "Do NOT perform any calculations — all numbers are already computed. " +
-          "Keep each recommendation to 1–2 sentences. Be specific and direct.",
+          "Your job is to give concise, actionable recommendations. " +
+          "When the user asks about goals, state specific monthly rupee amounts they should save to hit their targets taking inflation into account. " +
+          "Give appreciation if their spending is below safe-to-spend limits. " +
+          "Keep each recommendation to 1–2 sentences. Be specific, motivating, and direct.",
       },
       {
         role: "user",
@@ -107,18 +119,47 @@ export const getRecommendationsService = async (
 
 // ── Rule-based fallback (no LLM API key required) ────────────────────────────
 const buildFallbackRecommendations = (
-  state:    FinancialState,
-  forecast: ForecastResult,
-  risk:     RiskResult
+  state:       FinancialState,
+  forecast:    ForecastResult,
+  risk:        RiskResult,
+  userPrompt?: string
 ): { recommendations: string[]; rawResponse: string } => {
   const recs: string[] = [];
+  const query = (userPrompt || "").toLowerCase();
 
+  // 1. Goal advice if query mentions goals or user has active goals
+  if (state.activeGoals.length > 0 && (query.includes("goal") || query.includes("save") || recs.length === 0)) {
+    const primaryGoal = state.activeGoals[0];
+    const recommendedSaving = Math.round(state.safeSpendableAmount * 0.4);
+    recs.push(
+      `Goal Savings Plan: Allocate ₹${recommendedSaving.toLocaleString("en-IN")}/month of your safe surplus to your "${primaryGoal.name}" goal to stay well ahead of your target deadline.`
+    );
+  }
+
+  // 2. Safe-to-spend appreciation or guidance
+  if (state.safeDailySpending > 0 && state.avgDailySpending <= state.safeDailySpending) {
+    const dailyDiff = state.safeDailySpending - state.avgDailySpending;
+    recs.push(
+      `🎉 Great financial discipline! You are spending ₹${dailyDiff.toLocaleString("en-IN")}/day below your safe-to-spend limit. This frees up extra monthly savings to compound your wealth.`
+    );
+  } else if (state.safeDailySpending > 0) {
+    recs.push(
+      `To stay on track this month, try to keep daily discretionary spending at or below ₹${state.safeDailySpending.toLocaleString("en-IN")}.`
+    );
+  }
+
+  // 3. Inflation guidance for long-term targets
+  recs.push(
+    "Inflation Protection: At a projected 6% annual inflation rate, factor in an extra 10–18% target buffer for long-term goals beyond 2 years, parking funds in index mutual funds."
+  );
+
+  // 4. Overspending check
   if (forecast.willExceedBudget) {
     const top = forecast.categoryForecasts
       .filter((c) => c.willExceed)
       .sort((a, b) => b.expectedExcess - a.expectedExcess)[0];
 
-    recs.push(
+    recs.unshift(
       top
         ? `Your ${top.category} spending is projected to exceed its budget by ₹${top.expectedExcess.toLocaleString("en-IN")}. Try to reduce ${top.category} expenses for the rest of the month.`
         : `Your total spending is projected to exceed the budget by ₹${forecast.expectedExcess.toLocaleString("en-IN")}. Review your discretionary spending.`
@@ -129,23 +170,6 @@ const buildFallbackRecommendations = (
     recs.push(
       `Your upcoming obligations (₹${state.totalUpcomingAmount.toLocaleString("en-IN")}) are close to your current cash balance. Avoid large non-essential purchases until they are paid.`
     );
-  }
-
-  if (forecast.velocityChangePercent >= 30) {
-    recs.push(
-      `Your spending pace is ${forecast.velocityChangePercent}% faster than last month. If this continues, you'll likely overspend by month-end.`
-    );
-  }
-
-  if (state.safeDailySpending > 0) {
-    recs.push(
-      `To stay on track this month, try to keep daily spending at or below ₹${state.safeDailySpending.toLocaleString("en-IN")}.`
-    );
-  }
-
-  if (recs.length === 0) {
-    recs.push("Your finances look healthy this month. Keep up the current spending habits.");
-    recs.push(`You have ₹${state.safeSpendableAmount.toLocaleString("en-IN")} safely available for discretionary spending this month.`);
   }
 
   return { recommendations: recs.slice(0, 3), rawResponse: recs.join("\n") };

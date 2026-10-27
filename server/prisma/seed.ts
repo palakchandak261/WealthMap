@@ -1,8 +1,7 @@
 /**
  * WealthMap — Database Seed
- * Creates one demo user with a realistic financial footprint so the backend
- * team can build/test the Financial State, Forecasting, Risk, Dependency
- * Graph, and What-If engines against real rows immediately.
+ * Creates demo user with rich financial footprint including advanced goals,
+ * safe-to-spend appreciation profile, obligations, and dependency graph.
  *
  * Run with: npx prisma db seed
  */
@@ -26,7 +25,7 @@ async function main() {
 
   const user = await prisma.user.create({
     data: {
-      name: 'Demo User',
+      name: 'Demo Student / User',
       email: 'demo@wealthmap.app',
       // bcrypt hash of "Demo@1234"
       passwordHash: '$2a$12$DF3subn.iol3eNpmxCn.9eg1lrJr3Q4cfjPDw4ja58E1w6uV1unem',
@@ -36,34 +35,50 @@ async function main() {
       emergencyFundBalance: '50000.00',
       declaredMonthlyIncome: '75000.00',
       onboardingComplete: true,
+      emailVerified: true,
+      otpVerified: true,
     },
   });
 
-  await prisma.income.create({
-    data: {
-      userId: user.id,
-      source: 'Salary',
-      amount: '75000.00',
-      frequency: Frequency.MONTHLY,
-      isRecurring: true,
-      receivedAt: new Date('2026-09-01'),
-    },
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  await prisma.income.createMany({
+    data: [
+      {
+        userId: user.id,
+        source: 'Tech Internship / Salary',
+        amount: '75000.00',
+        frequency: Frequency.MONTHLY,
+        isRecurring: true,
+        receivedAt: new Date(currentYear, currentMonth - 1, 1),
+      },
+      {
+        userId: user.id,
+        source: 'Freelance Design & Tutoring',
+        amount: '15000.00',
+        frequency: Frequency.MONTHLY,
+        isRecurring: false,
+        receivedAt: new Date(currentYear, currentMonth - 1, 10),
+      },
+    ],
   });
 
-  const budget = await prisma.budget.create({
+  await prisma.budget.create({
     data: {
       userId: user.id,
-      month: 9,
-      year: 2026,
-      totalBudget: '50000.00',
+      month: currentMonth,
+      year: currentYear,
+      totalBudget: '52000.00',
       categoryBudgets: {
         create: [
-          { category: 'Groceries', limit: '10000.00' },
-          { category: 'Rent', limit: '20000.00' },
-          { category: 'Dining', limit: '6000.00' },
-          { category: 'Transport', limit: '4000.00' },
-          { category: 'Entertainment', limit: '5000.00' },
-          { category: 'Utilities', limit: '5000.00' },
+          { category: 'FOOD', limit: '12000.00' },
+          { category: 'RENT', limit: '20000.00' },
+          { category: 'TRANSPORT', limit: '4000.00' },
+          { category: 'ENTERTAINMENT', limit: '5000.00' },
+          { category: 'UTILITIES', limit: '5000.00' },
+          { category: 'SHOPPING', limit: '6000.00' },
         ],
       },
     },
@@ -72,45 +87,74 @@ async function main() {
 
   await prisma.expense.createMany({
     data: [
-      { userId: user.id, category: 'Groceries', amount: '2200.00', description: 'Weekly groceries', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date('2026-09-02') },
-      { userId: user.id, category: 'Dining', amount: '1500.00', description: 'Dinner out', paymentMethod: PaymentMethod.CARD, isRecurring: false, spentAt: new Date('2026-09-05') },
-      { userId: user.id, category: 'Transport', amount: '900.00', description: 'Cab rides', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date('2026-09-06') },
-      { userId: user.id, category: 'Entertainment', amount: '2500.00', description: 'Concert tickets', paymentMethod: PaymentMethod.CARD, isRecurring: false, spentAt: new Date('2026-09-10') },
-      { userId: user.id, category: 'Groceries', amount: '2100.00', description: 'Weekly groceries', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date('2026-09-12') },
-      { userId: user.id, category: 'Utilities', amount: '3200.00', description: 'Electricity + water', paymentMethod: PaymentMethod.NET_BANKING, isRecurring: true, spentAt: new Date('2026-09-14') },
-      { userId: user.id, category: 'Entertainment', amount: '299.00', description: 'Streaming subscription', paymentMethod: PaymentMethod.CARD, isRecurring: true, spentAt: new Date('2026-09-01') },
+      { userId: user.id, category: 'RENT', amount: '20000.00', description: 'Monthly Apartment Rent', paymentMethod: PaymentMethod.NET_BANKING, isRecurring: true, spentAt: new Date(currentYear, currentMonth - 1, 1) },
+      { userId: user.id, category: 'FOOD', amount: '2450.00', description: 'Weekly groceries at Nature Basket', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date(currentYear, currentMonth - 1, 3) },
+      { userId: user.id, category: 'TRANSPORT', amount: '650.00', description: 'Uber to University Campus', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date(currentYear, currentMonth - 1, 5) },
+      { userId: user.id, category: 'FOOD', amount: '1200.00', description: 'Team lunch with classmates', paymentMethod: PaymentMethod.CARD, isRecurring: false, spentAt: new Date(currentYear, currentMonth - 1, 7) },
+      { userId: user.id, category: 'UTILITIES', amount: '2100.00', description: 'Electricity & High-speed WiFi Bill', paymentMethod: PaymentMethod.NET_BANKING, isRecurring: true, spentAt: new Date(currentYear, currentMonth - 1, 10) },
+      { userId: user.id, category: 'ENTERTAINMENT', amount: '1500.00', description: 'IMAX Cinema & Snacks', paymentMethod: PaymentMethod.CARD, isRecurring: false, spentAt: new Date(currentYear, currentMonth - 1, 12) },
+      { userId: user.id, category: 'FOOD', amount: '1850.00', description: 'Organic veggies & dairy groceries', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date(currentYear, currentMonth - 1, 14) },
+      { userId: user.id, category: 'SHOPPING', amount: '1499.00', description: 'Reference textbooks & stationery', paymentMethod: PaymentMethod.CARD, isRecurring: false, spentAt: new Date(currentYear, currentMonth - 1, 16) },
+      { userId: user.id, category: 'TRANSPORT', amount: '450.00', description: 'Metro card monthly recharge', paymentMethod: PaymentMethod.UPI, isRecurring: false, spentAt: new Date(currentYear, currentMonth - 1, 18) },
     ],
   });
 
   await prisma.obligation.createMany({
     data: [
-      { userId: user.id, name: 'Home Rent', type: ObligationType.RENT, amount: '20000.00', dueDate: new Date('2026-10-01'), frequency: Frequency.MONTHLY, isRecurring: true },
-      { userId: user.id, name: 'Car EMI', type: ObligationType.EMI, amount: '8500.00', dueDate: new Date('2026-09-28'), frequency: Frequency.MONTHLY, isRecurring: true },
-      { userId: user.id, name: 'Health Insurance', type: ObligationType.INSURANCE, amount: '12000.00', dueDate: new Date('2026-12-15'), frequency: Frequency.YEARLY, isRecurring: true },
+      { userId: user.id, name: 'Apartment Rent', type: ObligationType.RENT, amount: '20000.00', dueDate: new Date(currentYear, currentMonth, 1), frequency: Frequency.MONTHLY, isRecurring: true },
+      { userId: user.id, name: 'Student Laptop EMI', type: ObligationType.EMI, amount: '4500.00', dueDate: new Date(currentYear, currentMonth - 1, 28), frequency: Frequency.MONTHLY, isRecurring: true },
+      { userId: user.id, name: 'Health & Medical Insurance', type: ObligationType.INSURANCE, amount: '12000.00', dueDate: new Date(currentYear, 11, 15), frequency: Frequency.YEARLY, isRecurring: true },
+      { userId: user.id, name: 'Gym & Sports Membership', type: ObligationType.SUBSCRIPTION, amount: '1500.00', dueDate: new Date(currentYear, currentMonth - 1, 25), frequency: Frequency.MONTHLY, isRecurring: true, isPaid: true },
     ],
   });
 
-  await prisma.goal.create({
-    data: {
-      userId: user.id,
-      name: 'Emergency Fund',
-      targetAmount: '300000.00',
-      currentAmount: '150000.00',
-      deadline: new Date('2027-06-30'),
-      status: GoalStatus.ACTIVE,
-    },
+  await prisma.goal.createMany({
+    data: [
+      {
+        userId: user.id,
+        name: 'Emergency Buffer Fund (6 Months)',
+        targetAmount: '180000.00',
+        currentAmount: '110000.00',
+        deadline: new Date('2026-12-31'),
+        status: GoalStatus.ACTIVE,
+      },
+      {
+        userId: user.id,
+        name: 'M4 MacBook Pro & Dev Setup',
+        targetAmount: '150000.00',
+        currentAmount: '60000.00',
+        deadline: new Date('2027-08-31'),
+        status: GoalStatus.ACTIVE,
+      },
+      {
+        userId: user.id,
+        name: 'Japan Graduation Trip 🌸',
+        targetAmount: '250000.00',
+        currentAmount: '75000.00',
+        deadline: new Date('2028-04-15'),
+        status: GoalStatus.ACTIVE,
+      },
+      {
+        userId: user.id,
+        name: 'EV Car Down Payment',
+        targetAmount: '400000.00',
+        currentAmount: '65000.00',
+        deadline: new Date('2029-12-31'),
+        status: GoalStatus.ACTIVE,
+      },
+    ],
   });
 
   await prisma.riskLog.create({
     data: {
       userId: user.id,
-      riskScore: 42,
-      riskLevel: 'MODERATE',
-      budgetRisk: 35,
-      cashFlowRisk: 40,
-      obligationRisk: 55,
-      velocityRisk: 30,
-      goalRisk: 50,
+      riskScore: 24,
+      riskLevel: 'LOW',
+      budgetRisk: 22,
+      cashFlowRisk: 20,
+      obligationRisk: 30,
+      velocityRisk: 25,
+      goalRisk: 22,
     },
   });
 
@@ -119,37 +163,35 @@ async function main() {
       userId: user.id,
       type: 'EXPENSE_FORECAST',
       resultJson: {
-        projectedExpense: 48750.0,
-        currentMonthVelocity: 46000.0,
-        historicalMonthlyAverage: 49500.0,
-        recent7DayTrend: 51000.0,
+        projectedExpense: 36000.0,
+        currentMonthVelocity: 34000.0,
+        historicalMonthlyAverage: 38000.0,
+        recent7DayTrend: 35000.0,
       },
     },
   });
 
-  // Dependency graph: Income -> Cash -> {EMI, Rent, Expenses}, Cash -> Savings/Goals
-  const income = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.INCOME, label: 'Salary', value: '75000.00', positionX: 0, positionY: 0 } });
-  const cash = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.CASH, label: 'Cash', value: '85000.00', positionX: 250, positionY: 0 } });
-  const rent = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.RENT, label: 'Home Rent', value: '20000.00', positionX: 500, positionY: -100 } });
-  const emi = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.EMI, label: 'Car EMI', value: '8500.00', positionX: 500, positionY: 0 } });
-  const expenses = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.EXPENSES, label: 'Monthly Expenses', value: '12400.00', positionX: 500, positionY: 100 } });
-  const savings = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.SAVINGS, label: 'Savings', value: '150000.00', positionX: 500, positionY: 200 } });
-  const risk = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.RISK, label: 'Risk Score', value: '42', positionX: 750, positionY: 0 } });
+  // Dependency graph
+  const income = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.INCOME, label: 'Salary + Freelance (₹90,000)', value: '90000.00', positionX: 0, positionY: 0 } });
+  const cash = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.CASH, label: 'Liquid Cash (₹85,000)', value: '85000.00', positionX: 250, positionY: 0 } });
+  const rent = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.RENT, label: 'Apartment Rent (₹20,000)', value: '20000.00', positionX: 500, positionY: -100 } });
+  const emi = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.EMI, label: 'Laptop EMI (₹4,500)', value: '4500.00', positionX: 500, positionY: 0 } });
+  const expenses = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.EXPENSES, label: 'Discretionary Spend (₹7,900)', value: '7900.00', positionX: 500, positionY: 100 } });
+  const savings = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.SAVINGS, label: 'Goals & Savings (₹150,000)', value: '150000.00', positionX: 500, positionY: 200 } });
+  const risk = await prisma.graphNode.create({ data: { userId: user.id, type: GraphNodeType.RISK, label: 'Risk Score (24/100 LOW)', value: '24', positionX: 750, positionY: 0 } });
 
   await prisma.graphEdge.createMany({
     data: [
-      { sourceNodeId: income.id, targetNodeId: cash.id, relationship: 'deposits_into', weight: 1.0, severity: GraphSeverity.CRITICAL },
-      { sourceNodeId: cash.id, targetNodeId: rent.id, relationship: 'funds', weight: 0.24, severity: GraphSeverity.HIGH },
-      { sourceNodeId: cash.id, targetNodeId: emi.id, relationship: 'funds', weight: 0.1, severity: GraphSeverity.HIGH },
-      { sourceNodeId: cash.id, targetNodeId: expenses.id, relationship: 'funds', weight: 0.15, severity: GraphSeverity.MEDIUM },
-      { sourceNodeId: cash.id, targetNodeId: savings.id, relationship: 'funds', weight: 0.2, severity: GraphSeverity.LOW },
-      { sourceNodeId: expenses.id, targetNodeId: cash.id, relationship: 'reduces', weight: 1.0, severity: GraphSeverity.HIGH },
-      { sourceNodeId: rent.id, targetNodeId: risk.id, relationship: 'increases', weight: 0.3, severity: GraphSeverity.HIGH },
-      { sourceNodeId: emi.id, targetNodeId: risk.id, relationship: 'increases', weight: 0.2, severity: GraphSeverity.MEDIUM },
+      { sourceNodeId: income.id, targetNodeId: cash.id, relationship: 'deposits_into', weight: 1.0, severity: GraphSeverity.LOW },
+      { sourceNodeId: cash.id, targetNodeId: rent.id, relationship: 'funds', weight: 0.23, severity: GraphSeverity.MEDIUM },
+      { sourceNodeId: cash.id, targetNodeId: emi.id, relationship: 'funds', weight: 0.05, severity: GraphSeverity.LOW },
+      { sourceNodeId: cash.id, targetNodeId: expenses.id, relationship: 'funds', weight: 0.09, severity: GraphSeverity.LOW },
+      { sourceNodeId: cash.id, targetNodeId: savings.id, relationship: 'funds', weight: 0.35, severity: GraphSeverity.LOW },
+      { sourceNodeId: expenses.id, targetNodeId: risk.id, relationship: 'mitigates', weight: 0.1, severity: GraphSeverity.LOW },
     ],
   });
 
-  console.log('✔ Seed complete. Demo user:', user.email);
+  console.log('✔ WealthMap seed complete. Demo user ready:', user.email);
 }
 
 main()

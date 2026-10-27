@@ -12,7 +12,10 @@ export const createGoal = async (req: AuthRequest, res: Response, next: NextFunc
 };
 
 export const getGoals = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { ok(res, await getGoalsService(req.userId!)); }
+  try {
+    const rate = req.query.inflationRate ? Number(req.query.inflationRate) : undefined;
+    ok(res, await getGoalsService(req.userId!, { inflationRate: rate }));
+  }
   catch (err) { next(err); }
 };
 

@@ -2,7 +2,7 @@ import { Response, NextFunction } from "express";
 import { AuthRequest } from "../../middleware/authenticate";
 import { ok } from "../../lib/response";
 import {
-  createExpenseService, getExpensesService, getExpenseByIdService,
+  createExpenseService, createBulkExpensesService, getExpensesService, getExpenseByIdService,
   updateExpenseService, deleteExpenseService, getDailyTimelineService,
 } from "./expenses.service";
 
@@ -11,6 +11,14 @@ const now = new Date();
 export const createExpense = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try { ok(res, await createExpenseService(req.userId!, req.body), "Expense added", 201); }
   catch (err) { next(err); }
+};
+
+export const createBulkExpenses = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const items = Array.isArray(req.body.items) ? req.body.items : Array.isArray(req.body) ? req.body : [];
+    const result = await createBulkExpensesService(req.userId!, items);
+    ok(res, result, `${result.count} expenses imported`, 201);
+  } catch (err) { next(err); }
 };
 
 export const getExpenses = async (req: AuthRequest, res: Response, next: NextFunction) => {

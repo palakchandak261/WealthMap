@@ -20,8 +20,11 @@ export const createGoalService = async (
   });
 };
 
-// ── List all active goals with progress ──────────────────────────────────────
-export const getGoalsService = async (userId: string) => {
+// ── List all active goals with inflation calculations & actionable advice ────
+export const getGoalsService = async (userId: string, options?: { inflationRate?: number }) => {
+  const inflationRate = options?.inflationRate ?? 6;
+  const now = new Date();
+
   const goals = await prisma.goal.findMany({
     where:   { userId },
     orderBy: { createdAt: "asc" },
@@ -33,18 +36,48 @@ export const getGoalsService = async (userId: string) => {
     const progress = target > 0 ? Math.round((current / target) * 100) : 0;
     const remaining = Math.max(target - current, 0);
 
-    // Required monthly saving to hit deadline from today
+    let yearsLeft = 1;
+    let monthsLeft = 12;
+    let inflationAdjustedTarget = target;
+    let inflationCost = 0;
     let requiredMonthlySaving: number | null = null;
+    let requiredMonthlySavingWithInflation: number | null = null;
+    let advice = "";
+
     if (g.deadline && remaining > 0) {
-      const monthsLeft = Math.max(
-        (g.deadline.getFullYear() - new Date().getFullYear()) * 12 +
-        (g.deadline.getMonth() - new Date().getMonth()),
+      const diffMs = g.deadline.getTime() - now.getTime();
+      yearsLeft = Math.max(diffMs / (365.25 * 86400_000), 0.08);
+      monthsLeft = Math.max(
+        (g.deadline.getFullYear() - now.getFullYear()) * 12 +
+        (g.deadline.getMonth() - now.getMonth()),
         1
       );
+
+      // Compound inflation: FV = PV * (1 + r)^t
+      inflationAdjustedTarget = Math.round(target * Math.pow(1 + inflationRate / 100, yearsLeft));
+      inflationCost = inflationAdjustedTarget - target;
+
       requiredMonthlySaving = Math.ceil(remaining / monthsLeft);
+      requiredMonthlySavingWithInflation = Math.ceil(Math.max(inflationAdjustedTarget - current, 0) / monthsLeft);
+
+      advice = `Save ₹${requiredMonthlySavingWithInflation.toLocaleString('en-IN')}/month to achieve "${g.name}" on time, accounting for ${inflationRate}% annual inflation.`;
     }
 
-    return { ...g, target, current, progress, remaining, requiredMonthlySaving };
+    return {
+      ...g,
+      target,
+      current,
+      progress,
+      remaining,
+      monthsLeft,
+      yearsLeft,
+      inflationRate,
+      inflationAdjustedTarget,
+      inflationCost,
+      requiredMonthlySaving,
+      requiredMonthlySavingWithInflation,
+      advice,
+    };
   });
 };
 

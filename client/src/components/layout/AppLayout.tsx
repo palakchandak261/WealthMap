@@ -4,9 +4,10 @@ import {
   LayoutDashboard, TrendingUp, CreditCard, Target,
   DollarSign, Calendar, BarChart2, Shield, Zap,
   GitBranch, Cpu, Sparkles, LogOut, Menu, X,
-  ChevronRight,
+  ChevronRight, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { resetMockStore } from '../../services/mockData';
 import './Layout.css';
 
 interface NavItem {
@@ -45,7 +46,7 @@ const Sidebar: React.FC<{ collapsed: boolean; onToggle: () => void; onNavigate?:
       {/* Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">
-        <img src="/wealthmap-logo.png" alt="WealthMap" />
+          <img src="/wealthmap-logo.png" alt="WealthMap" />
         </div>
         {!collapsed && <span className="sidebar-logo-text">WealthMap</span>}
         <button className="sidebar-toggle" onClick={onToggle} aria-label="Toggle sidebar">
@@ -134,6 +135,12 @@ const Topbar: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => {
   const { pathname } = useLocation();
   const pageTitle = pageTitles[pathname] ?? 'Your workspace';
 
+  const handleResetDemo = () => {
+    resetMockStore();
+    localStorage.setItem('wm_demo_mode', 'true');
+    window.location.reload();
+  };
+
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -145,10 +152,20 @@ const Topbar: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => {
           <strong className="topbar-title">{pageTitle}</strong>
         </div>
       </div>
-      <div className="topbar-right">
+      <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        <button
+          className="btn btn-secondary btn-sm"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', padding: '0.35rem 0.65rem' }}
+          onClick={handleResetDemo}
+          title="Reload fresh demo mock data"
+        >
+          <Sparkles size={13} color="var(--primary-600)" />
+          <RefreshCw size={11} /> Demo Data
+        </button>
+
         <div className="topbar-user-copy">
           <span className="topbar-user-greeting">Signed in as</span>
-          <strong>{user?.name ?? 'User'}</strong>
+          <strong>{user?.name ?? 'Demo User'}</strong>
         </div>
         <div className="topbar-avatar" aria-hidden="true">
           {user?.name?.charAt(0).toUpperCase() ?? 'U'}

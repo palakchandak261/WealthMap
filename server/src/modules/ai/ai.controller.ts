@@ -10,6 +10,7 @@ import { getRecommendationsService } from "./ai.service";
 export const getRecommendations = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
+    const userPrompt = req.body?.context;
 
     // Run all engines to get structured data first
     const state    = await buildFinancialState(userId);
@@ -17,7 +18,7 @@ export const getRecommendations = async (req: AuthRequest, res: Response, next: 
     const risk     = await runRiskEngine(userId, state, forecast);
     const health   = runHealthScoreEngine(state, forecast, risk);
 
-    const result = await getRecommendationsService(state, forecast, risk, health);
+    const result = await getRecommendationsService(state, forecast, risk, health, userPrompt);
 
     ok(res, {
       recommendations: result.recommendations,

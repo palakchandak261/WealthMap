@@ -29,6 +29,37 @@ export const createExpenseService = async (
   });
 };
 
+// ── Bulk Create (CSV / Excel Upload) ──────────────────────────────────────────
+export const createBulkExpensesService = async (
+  userId: string,
+  items: Array<{
+    category: string;
+    amount: number;
+    description?: string;
+    paymentMethod?: PaymentMethod;
+    isRecurring?: boolean;
+    spentAt: string;
+  }>
+) => {
+  if (!items || items.length === 0) return { count: 0 };
+
+  const validItems = items.map((body) => ({
+    userId,
+    category:      body.category || "OTHER",
+    amount:        body.amount,
+    description:   body.description || null,
+    paymentMethod: (body.paymentMethod as PaymentMethod) ?? "OTHER",
+    isRecurring:   body.isRecurring ?? false,
+    spentAt:       new Date(body.spentAt),
+  }));
+
+  const result = await prisma.expense.createMany({
+    data: validItems,
+  });
+
+  return { count: result.count };
+};
+
 // ── List with optional filters ────────────────────────────────────────────────
 export const getExpensesService = async (
   userId: string,

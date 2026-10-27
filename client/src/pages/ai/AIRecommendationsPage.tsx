@@ -8,6 +8,8 @@ import type { AIRecommendation } from '../../types';
 import './AIRecommendations.css';
 
 const exampleContexts = [
+  'How much should I save monthly for my active goals?',
+  'How does 6% inflation affect my goals & savings?',
   'I want to save more this month',
   "My food budget is always exceeded",
   "I have a loan EMI coming up",
@@ -50,8 +52,8 @@ const AIRecommendationsPage: React.FC = () => {
       <div className="page-header">
         <div className="ai-page-header">
           <div>
-            <h1>AI Recommendations</h1>
-            <p>Get personalized financial advice powered by AI, based on your real financial data</p>
+            <h1>AI Recommendations & Advisory</h1>
+            <p>Get personalized financial and goal savings advice powered by AI</p>
           </div>
           {result && (
             <button className="btn btn-secondary btn-sm" onClick={() => fetchRecommendations()}>
@@ -69,14 +71,14 @@ const AIRecommendationsPage: React.FC = () => {
           </div>
           <div>
             <h3 style={{ margin: 0 }}>Ask for Advice</h3>
-            <p style={{ margin: 0, fontSize: '0.8rem' }}>Tell the AI your concern or goal (optional)</p>
+            <p style={{ margin: 0, fontSize: '0.8rem' }}>Tell the AI your concern, inflation question, or savings target</p>
           </div>
         </div>
 
         <div className="ai-input-row">
           <input
             id="ai-context-input"
-            placeholder="e.g. 'I want to reduce spending on food' or leave blank for general advice…"
+            placeholder="e.g. 'How much should I save monthly for my Emergency Fund?' or leave blank for general advice…"
             value={context}
             onChange={e => setContext(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !loading && fetchRecommendations()}
@@ -117,8 +119,8 @@ const AIRecommendationsPage: React.FC = () => {
             <div className="ai-pulse-ring" />
             <Brain size={28} color="var(--primary-500)" />
           </div>
-          <h3>Analyzing your financial data…</h3>
-          <p>The AI is reviewing your income, expenses, budget, risk profile, and goals.</p>
+          <h3>Analyzing your financial data & active goals…</h3>
+          <p>The AI is reviewing your income, expenses, safe-to-spend surplus, inflation impact, and goals.</p>
         </div>
       )}
 
@@ -170,7 +172,7 @@ const AIRecommendationsPage: React.FC = () => {
             <div className="neu-raised ai-recs-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
                 <CheckCircle size={18} color="var(--success-dark)" />
-                <h3 style={{ margin: 0 }}>Recommendations</h3>
+                <h3 style={{ margin: 0 }}>Recommendations & Actionable Strategy</h3>
                 <span className="badge badge-success">{result.recommendations?.length ?? 0}</span>
               </div>
               <div className="ai-recs-list">
