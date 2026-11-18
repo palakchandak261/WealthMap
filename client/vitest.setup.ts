@@ -10,14 +10,11 @@ import React from 'react';
 
 // Mock ReCAPTCHA since it requires a real DOM/Network
 vi.mock('react-google-recaptcha', () => {
-  return {
-    default: (props: any) => {
-      React.useEffect(() => {
-        if (props.onChange) {
-          props.onChange('fake-captcha-token');
-        }
-      }, [props.onChange]);
-      return React.createElement('div', { 'data-testid': 'mock-recaptcha' }, 'ReCAPTCHA Mock');
-    }
+  const MockReCaptcha = ({ onChange }: { onChange?: (token: string) => void }) => {
+    React.useEffect(() => {
+      onChange?.('fake-captcha-token');
+    }, [onChange]);
+    return React.createElement('div', { 'data-testid': 'mock-recaptcha' }, 'ReCAPTCHA Mock');
   };
+  return { default: MockReCaptcha };
 });

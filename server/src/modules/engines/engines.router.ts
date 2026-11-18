@@ -10,6 +10,7 @@ import {
   simulate,
   getAnomalies,
   getRiskHistory,
+  getPlanning,
 } from "./engines.controller";
 
 export const enginesRouter = Router();
@@ -25,6 +26,7 @@ enginesRouter.get("/safe-to-spend",    getSafeToSpend);       // safe daily amou
 enginesRouter.get("/dependency-graph", getDependencyGraph);   // nodes + edges
 enginesRouter.get("/anomalies",        getAnomalies);         // unusual expenses
 enginesRouter.get("/risk-history",     getRiskHistory);       // past risk logs
+enginesRouter.get("/planning",         getPlanning);          // goal plans + inflation + appreciation
 
 // What-If simulator (POST because it takes a hypothetical expense body)
 enginesRouter.post("/simulate", simulate);

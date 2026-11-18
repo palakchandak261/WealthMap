@@ -15,8 +15,7 @@ export const createExpense = async (req: AuthRequest, res: Response, next: NextF
 
 export const createBulkExpenses = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const items = Array.isArray(req.body.items) ? req.body.items : Array.isArray(req.body) ? req.body : [];
-    const result = await createBulkExpensesService(req.userId!, items);
+    const result = await createBulkExpensesService(req.userId!, req.body.items);
     ok(res, result, `${result.count} expenses imported`, 201);
   } catch (err) { next(err); }
 };

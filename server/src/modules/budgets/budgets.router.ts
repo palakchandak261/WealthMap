@@ -3,7 +3,7 @@ import { authenticate } from "../../middleware/authenticate";
 import { validate } from "../../middleware/validate";
 import { CreateBudgetSchema, UpdateBudgetSchema } from "./budgets.schemas";
 import {
-  createBudget, getCurrentBudget, getBudgetById, updateBudget, deleteBudget,
+  createBudget, listBudgets, getCurrentBudget, getBudgetById, updateBudget, deleteBudget,
 } from "./budgets.controller";
 
 export const budgetsRouter = Router();
@@ -11,6 +11,7 @@ export const budgetsRouter = Router();
 budgetsRouter.use(authenticate);
 
 budgetsRouter.post("/",         validate(CreateBudgetSchema), createBudget);
+budgetsRouter.get("/",          listBudgets);
 budgetsRouter.get("/current",   getCurrentBudget);
 budgetsRouter.get("/:id",       getBudgetById);
 budgetsRouter.patch("/:id",     validate(UpdateBudgetSchema), updateBudget);

@@ -13,7 +13,8 @@ export const createGoal = async (req: AuthRequest, res: Response, next: NextFunc
 
 export const getGoals = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const rate = req.query.inflationRate ? Number(req.query.inflationRate) : undefined;
+    const raw  = req.query.inflationRate;
+    const rate = raw !== undefined && raw !== "" && Number.isFinite(Number(raw)) ? Number(raw) : null;
     ok(res, await getGoalsService(req.userId!, { inflationRate: rate }));
   }
   catch (err) { next(err); }
@@ -26,8 +27,7 @@ export const updateGoal = async (req: AuthRequest, res: Response, next: NextFunc
 
 export const contributeToGoal = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { amount } = req.body;
-    ok(res, await contributeToGoalService(req.userId!, req.params.id, Number(amount)), "Contribution added");
+    ok(res, await contributeToGoalService(req.userId!, req.params.id, req.body), "Contribution added");
   } catch (err) { next(err); }
 };
 

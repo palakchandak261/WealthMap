@@ -18,7 +18,26 @@ import { runRiskEngine } from "./risk.service";
 import { runHealthScoreEngine } from "./healthScore.service";
 import { buildDependencyGraph, getGraphForUser, getCascadingImpact } from "./dependency.service";
 import { runSimulation } from "./simulation.service";
+import { buildPlanningSnapshot } from "./planning.service";
 import prisma from "../../lib/prisma";
+
+// ── GET /engine/planning?inflationRate=6&inflation=off ───────────────────────
+// Goal plans ("save ₹X/month"), savings allocation, yearly inflation projection
+export const getPlanning = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const rateParam = req.query.inflationRate;
+    const rate = rateParam !== undefined && rateParam !== "" ? Number(rateParam) : null;
+    if (rate !== null && (!Number.isFinite(rate) || rate < 0 || rate > 50)) {
+      return next(Object.assign(new Error("inflationRate must be between 0 and 50"), { statusCode: 400, code: "VALIDATION_ERROR" }));
+    }
+    const state    = await buildFinancialState(req.userId!);
+    const forecast = await runForecastingEngine(req.userId!, state);
+    ok(res, await buildPlanningSnapshot(req.userId!, state, forecast, {
+      inflationRate:    rate,
+      inflationEnabled: req.query.inflation !== "off",
+    }));
+  } catch (err) { next(err); }
+};
 
 // ── GET /engine/financial-state ───────────────────────────────────────────────
 export const getFinancialState = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -68,6 +87,8 @@ export const getSafeToSpend = async (req: AuthRequest, res: Response, next: Next
       daysRemaining:       state.daysRemainingInMonth,
       budgetRemaining:     state.totalRemaining,
       upcomingObligations: state.totalUpcomingAmount,
+      dueThisMonth:        state.dueThisMonthAmount ?? 0,
+      appreciation:        state.appreciation ?? null,
     });
   } catch (err) { next(err); }
 };

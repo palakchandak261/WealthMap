@@ -2,17 +2,19 @@ import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, Sparkles } from 'lucide-react';
 import ReCAPTCHA from 'react-google-recaptcha';
+import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 import api from '../../services/api';
-import { INITIAL_DEMO_USER, resetMockStore } from '../../services/mockData';
 import './Auth.css';
+
+const isServerUnreachable = (err: unknown) => axios.isAxiosError(err) && !err.response;
 
 // Google reCAPTCHA v2 test site key (always passes in dev — replace with real key in production)
 const RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
 
 const LoginPage: React.FC = () => {
-  const { login, setAuthData } = useAuth();
+  const { login, startDemo } = useAuth();
   const navigate = useNavigate();
   const captchaRef = useRef<ReCAPTCHA>(null);
 
@@ -20,6 +22,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
+  const [serverDown, setServerDown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [useOtp, setUseOtp] = useState(false);
@@ -28,6 +31,7 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setServerDown(false);
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     if (!captchaToken) { setError('Please complete the CAPTCHA verification.'); return; }
     setLoading(true);
@@ -35,6 +39,7 @@ const LoginPage: React.FC = () => {
       await login(email, password);
       navigate('/dashboard');
     } catch (err: unknown) {
+      setServerDown(isServerUnreachable(err));
       setError(getApiErrorMessage(err, 'Invalid credentials. Please try again.'));
       captchaRef.current?.reset();
       setCaptchaToken(null);
@@ -48,11 +53,14 @@ const LoginPage: React.FC = () => {
     if (!email) { setError('Please enter your email address first.'); return; }
     if (!captchaToken) { setError('Please complete the CAPTCHA verification.'); return; }
     setOtpLoading(true);
+    setServerDown(false);
     try {
+      localStorage.removeItem('wm_demo_mode');   // OTP always goes to the real server
       await api.post('/auth/send-otp', { email });
       navigate('/verify-otp', { state: { email } });
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message ?? 'Failed to send OTP. Please try again.');
+    } catch (err: unknown) {
+      setServerDown(isServerUnreachable(err));
+      setError(getApiErrorMessage(err, 'Failed to send OTP. Please try again.'));
       captchaRef.current?.reset();
       setCaptchaToken(null);
     } finally {
@@ -61,11 +69,7 @@ const LoginPage: React.FC = () => {
   };
 
   const handleDemoAccess = () => {
-    resetMockStore();
-    localStorage.setItem('wm_demo_mode', 'true');
-    localStorage.setItem('wm_token', 'mock-demo-jwt-token-wealthmap');
-    localStorage.setItem('wm_user', JSON.stringify(INITIAL_DEMO_USER));
-    setAuthData('mock-demo-jwt-token-wealthmap', INITIAL_DEMO_USER);
+    startDemo();
     navigate('/dashboard');
   };
 
@@ -122,7 +126,7 @@ const LoginPage: React.FC = () => {
               <Sparkles size={16} /> Instant Demo Presentation
             </div>
             <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Explore all features with complete mock data, inflation calculations, safe-to-spend appreciation, and CSV upload!
+              Explore every feature offline with sample data: inflation-adjusted goals, safe-to-spend appreciation, Excel/CSV import and the savings advisor. Changes stay in this browser.
             </p>
             <button
               type="button"
@@ -137,7 +141,15 @@ const LoginPage: React.FC = () => {
 
           {error && (
             <div className="alert-bar alert-bar-danger auth-error">
-              <AlertCircle size={16} />{error}
+              <AlertCircle size={16} />
+              <span>
+                {error}
+                {serverDown && (
+                  <> You can still explore everything offline with the{' '}
+                    <button type="button" className="link-button" onClick={handleDemoAccess}>demo workspace</button>.
+                  </>
+                )}
+              </span>
             </div>
           )}
 

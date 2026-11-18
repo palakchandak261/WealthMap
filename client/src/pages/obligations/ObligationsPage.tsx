@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   Plus, Pencil, Trash2, AlertCircle, CheckCircle,
-  CreditCard, Clock, AlertTriangle,
+  CreditCard, Clock, AlertTriangle, Upload,
 } from 'lucide-react';
 import api from '../../services/api';
+import ImportDataModal from '../../components/import/ImportDataModal';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { Obligation, ObligationType, Frequency } from '../../types';
@@ -44,6 +45,7 @@ const ObligationsPage: React.FC = () => {
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showImport, setShowImport] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -123,11 +125,17 @@ const ObligationsPage: React.FC = () => {
             <h1>Obligations</h1>
             <p>Track your recurring commitments — EMIs, rent, bills & subscriptions</p>
           </div>
-          <button id="btn-add-obligation" className="btn btn-primary" onClick={openAdd}>
-            <Plus size={16} /> Add Obligation
-          </button>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+              <Upload size={16} /> Import Excel / CSV
+            </button>
+            <button id="btn-add-obligation" className="btn btn-primary" onClick={openAdd}>
+              <Plus size={16} /> Add Obligation
+            </button>
+          </div>
         </div>
       </div>
+      <ImportDataModal open={showImport} onClose={() => setShowImport(false)} onImported={() => fetchData()} defaultSection="obligations" />
 
       {error && !showModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 

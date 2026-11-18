@@ -10,6 +10,7 @@ import { obligationsRouter } from "./modules/obligations/obligations.router";
 import { goalsRouter } from "./modules/goals/goals.router";
 import { enginesRouter } from "./modules/engines/engines.router";
 import { aiRouter } from "./modules/ai/ai.router";
+import { importRouter } from "./modules/import/import.router";
 import { errorHandler } from "./middleware/errorHandler";
 import { apiLimiter } from "./middleware/rateLimiter";
 
@@ -23,7 +24,7 @@ app.use(cors({
   origin: true,
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: "5mb" }));   // large CSV / Excel imports
 app.use(apiLimiter);  // gentle rate limit on all routes
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ app.use("/api/v1/obligations", obligationsRouter);
 app.use("/api/v1/goals",       goalsRouter);
 app.use("/api/v1/engine",      enginesRouter);
 app.use("/api/v1/ai",          aiRouter);
+app.use("/api/v1/import",      importRouter);
 
 // ── Health check ───────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {

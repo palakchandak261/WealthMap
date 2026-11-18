@@ -105,7 +105,7 @@ export const runSimulation = async (
   // Recalculate safe-to-spend on cloned state
   const buffer         = Math.max(simState.totalBudget * 0.10, 500);
   simState.safeSpendableAmount = Math.max(
-    simState.totalRemaining - simState.totalUpcomingAmount - buffer, 0
+    simState.totalRemaining - (simState.dueThisMonthAmount ?? simState.totalUpcomingAmount) - buffer, 0
   );
   simState.safeDailySpending = simState.daysRemainingInMonth > 0
     ? Math.round(simState.safeSpendableAmount / simState.daysRemainingInMonth)

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../../middleware/authenticate";
 import { validate } from "../../middleware/validate";
-import { CreateExpenseSchema, UpdateExpenseSchema } from "./expenses.schemas";
+import { CreateExpenseSchema, UpdateExpenseSchema, BulkExpensesSchema } from "./expenses.schemas";
 import {
   createExpense, createBulkExpenses, getExpenses, getExpenseById,
   updateExpense, deleteExpense, getDailyTimeline,
@@ -12,7 +12,7 @@ export const expensesRouter = Router();
 expensesRouter.use(authenticate);
 
 expensesRouter.post("/",               validate(CreateExpenseSchema), createExpense);
-expensesRouter.post("/bulk",           createBulkExpenses);
+expensesRouter.post("/bulk",           validate(BulkExpensesSchema), createBulkExpenses);
 expensesRouter.get("/",                getExpenses);
 expensesRouter.get("/daily-timeline",  getDailyTimeline);
 expensesRouter.get("/:id",             getExpenseById);

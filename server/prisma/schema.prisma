@@ -43,6 +43,12 @@ enum GoalStatus {
   ABANDONED
 }
 
+enum GoalPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
 enum PredictionType {
   EXPENSE_FORECAST
   CATEGORY_FORECAST
@@ -110,6 +116,7 @@ model User {
   budgets         Budget[]
   obligations     Obligation[]
   goals           Goal[]
+  goalContributions GoalContribution[]
   predictions     Prediction[]
   riskLogs        RiskLog[]
   graphNodes      GraphNode[]
@@ -241,20 +248,45 @@ model Obligation {
 // ----------------------------------------------------------------------------
 
 model Goal {
-  id            String     @id @default(uuid())
+  id            String       @id @default(uuid())
   userId        String
   name          String
-  targetAmount  Decimal    @db.Decimal(14, 2)
-  currentAmount Decimal    @default(0) @db.Decimal(14, 2)
+  targetAmount  Decimal      @db.Decimal(14, 2)
+  currentAmount Decimal      @default(0) @db.Decimal(14, 2)
   deadline      DateTime?
-  status        GoalStatus @default(ACTIVE)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  status        GoalStatus   @default(ACTIVE)
+  // Planning metadata — drives category-specific inflation & savings allocation
+  category      String       @default("OTHER") // EMERGENCY, EDUCATION, TRAVEL, GADGET, VEHICLE, HOME, WEDDING, HEALTH, RETIREMENT, OTHER
+  priority      GoalPriority @default(MEDIUM)
+  inflationRate Decimal?     @db.Decimal(5, 2) // custom % p.a.; null = category default
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions GoalContribution[]
 
   @@index([userId])
   @@map("goals")
+}
+
+// ----------------------------------------------------------------------------
+// 7b. GOAL_CONTRIBUTIONS — Savings history per goal (drives pace & projections)
+// ----------------------------------------------------------------------------
+
+model GoalContribution {
+  id            String   @id @default(uuid())
+  goalId        String
+  userId        String
+  amount        Decimal  @db.Decimal(14, 2)
+  note          String?
+  contributedAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([userId, contributedAt])
+  @@map("goal_contributions")
 }
 
 // ----------------------------------------------------------------------------

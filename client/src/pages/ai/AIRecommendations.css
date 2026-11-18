@@ -183,3 +183,38 @@
   .ai-two-col { grid-template-columns: 1fr; }
   .ai-input-row { flex-direction: column; align-items: stretch; }
 }
+
+/* ── v2: summary, insights, goal plan, inflation ─────────────────────── */
+.ai-summary-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.85rem; }
+.ai-summary-text { font-size: 0.92rem; line-height: 1.6; color: var(--text-primary); margin: 0 0 0.9rem; }
+.ai-fallback-note { display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.76rem; color: var(--text-muted); margin: -0.4rem 0 0.9rem; }
+.ai-fallback-note svg { flex-shrink: 0; margin-top: 2px; }
+.ai-section-title { display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; margin: 0 0 0.75rem; }
+.insight-amount { font-size: 0.78rem; letter-spacing: 0; text-transform: none; color: var(--primary-700); }
+.ai-plan-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.ai-plan-head .badge { display: inline-flex; align-items: center; gap: 0.3rem; }
+.ai-plan-summary { font-size: 0.84rem; color: var(--text-secondary); margin: 0 0 0.85rem; line-height: 1.5; }
+.ai-plan-link { display: inline-block; margin-top: 0.85rem; font-size: 0.82rem; font-weight: 600; color: var(--primary-600); text-decoration: none; }
+.ai-plan-link:hover { text-decoration: underline; }
+.ai-inflation-card { display: flex; gap: 0.85rem; align-items: flex-start; padding: 1.1rem 1.25rem; border-left: 3px solid #E7A83E; }
+.ai-inflation-card strong { font-size: 0.92rem; }
+.ai-inflation-card p { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.55; }
+.ai-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+}
+.ai-summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  color: var(--primary-600);
+}
+.ai-summary-stat span { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.3rem; }
+.ai-summary-stat strong { font-size: 1.05rem; color: var(--text-primary); }
+.ai-summary-stat small { font-size: 0.72rem; color: var(--text-muted); }
+@media (max-width: 900px) { .ai-two-col { grid-template-columns: 1fr; } }

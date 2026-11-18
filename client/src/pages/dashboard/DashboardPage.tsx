@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   DollarSign, Target, TrendingDown, Shield,
   AlertTriangle, CheckCircle, Zap, BarChart2,
-  ArrowUpRight, ArrowDownRight, RefreshCw, Award, Sparkles,
+  ArrowUpRight, ArrowDownRight, RefreshCw,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -11,6 +11,7 @@ import {
 import api from '../../services/api';
 import { formatCurrency, formatCurrencyCompact, riskLevelColor } from '../../utils/formatters';
 import type { FinancialState, ForecastResult, HealthScoreResult, RiskResult } from '../../types';
+import AppreciationCard from '../../components/shared/AppreciationCard';
 import './Dashboard.css';
 
 // ── Stat Card ──────────────────────────────────────────────────────────────────
@@ -183,14 +184,6 @@ const DashboardPage: React.FC = () => {
   const utilizationPct = state?.overallUtilization ?? 0;
   const activeAlerts = (risk?.alerts ?? []).filter((alert) => !alert.startsWith('✅'));
 
-  // Safe-To-Spend Appreciation calculations
-  const safeDaily = state?.safeDailySpending ?? 0;
-  const avgDaily = state?.avgDailySpending ?? 0;
-  const isSpendingSafely = safeDaily > 0 && avgDaily <= safeDaily;
-  const dailySavings = Math.max(safeDaily - avgDaily, 0);
-  const projectedExtraSavings = Math.round(dailySavings * (state?.daysRemainingInMonth ?? 1));
-  const safeMarginPct = safeDaily > 0 ? Math.round((dailySavings / safeDaily) * 100) : 0;
-
   return (
     <div className="dashboard">
       {/* Header */}
@@ -254,42 +247,8 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* ── SAFE-TO-SPEND APPRECIATION BANNER ─────────────────────────────────── */}
-      {isSpendingSafely && (
-        <div className="appreciation-card fade-in">
-          <div className="appreciation-content">
-            <div className="appreciation-trophy">
-              <Award size={28} />
-            </div>
-            <div>
-              <div className="appreciation-badge-pill">
-                <Sparkles size={13} /> SAFE-TO-SPEND APPRECIATION
-              </div>
-              <h3 className="appreciation-title">Outstanding Financial Discipline! 🎉</h3>
-              <p className="appreciation-desc">
-                You are spending an average of <strong>{formatCurrency(avgDaily)}/day</strong>, keeping you{' '}
-                <strong style={{ color: 'var(--success-dark)' }}>{formatCurrency(dailySavings)}/day under</strong> your safe-to-spend limit of {formatCurrency(safeDaily)}/day.
-                At this rate, you are on track to save an extra <strong style={{ color: 'var(--primary-700)' }}>{formatCurrency(projectedExtraSavings)}</strong> this month to fund your goals faster!
-              </p>
-            </div>
-          </div>
-          <div className="appreciation-metrics">
-            <div className="appreciation-metric-item">
-              <div className="appreciation-metric-val">+{safeMarginPct}%</div>
-              <div className="appreciation-metric-label">Safe Margin</div>
-            </div>
-            <div className="appreciation-metric-item">
-              <div className="appreciation-metric-val">{formatCurrency(dailySavings)}</div>
-              <div className="appreciation-metric-label">Saved / Day</div>
-            </div>
-            <div className="appreciation-metric-item">
-              <div className="appreciation-metric-val" style={{ color: 'var(--success-dark)' }}>
-                +{formatCurrency(projectedExtraSavings)}
-              </div>
-              <div className="appreciation-metric-label">Extra Goal Fuel</div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AppreciationCard appreciation={state?.appreciation} style={{ marginBottom: '1.75rem' }} />
+
 
       {/* Main content grid */}
       <div className="dashboard-grid">

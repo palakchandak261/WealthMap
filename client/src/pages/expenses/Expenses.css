@@ -90,82 +90,34 @@
   flex-wrap: wrap;
 }
 
-.upload-dropzone {
-  border: 2px dashed var(--primary-300);
-  background: rgba(47, 167, 122, 0.04);
-  border-radius: var(--radius-lg);
-  padding: 1.75rem 1.25rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--transition);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.upload-dropzone:hover {
-  background: rgba(47, 167, 122, 0.08);
-  border-color: var(--primary-500);
-  transform: translateY(-1px);
-}
-
-.upload-dropzone-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--primary-100);
-  color: var(--primary-700);
+/* Yearly expense inflation strip */
+.expense-inflation-strip {
   display: flex;
   align-items: center;
-  justify-content: center;
-}
-
-.preview-container {
-  margin-top: 1rem;
-  border: 1px solid var(--border-color, #E2E8F0);
+  gap: 1rem;
+  padding: 0.8rem 1.1rem;
+  margin-bottom: 1.25rem;
   border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.preview-header-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0.85rem;
-  background: var(--bg-subtle, #F8FAFC);
-  border-bottom: 1px solid var(--border-color, #E2E8F0);
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.preview-scroll-table {
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.template-download-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
+  border: 1px solid rgba(231, 168, 62, 0.35);
+  background: var(--bg-surface);
   flex-wrap: wrap;
 }
-
-.template-btn {
-  font-size: 0.78rem;
-  padding: 0.35rem 0.65rem;
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: transparent;
-  border: 1px dashed var(--primary-400);
-  color: var(--primary-700);
-  cursor: pointer;
-  transition: all var(--transition);
+.eis-icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: rgba(231, 168, 62, 0.15);
+  display: grid; place-items: center;
+  flex-shrink: 0;
 }
+.eis-cells { display: flex; gap: 1.75rem; flex: 1; flex-wrap: wrap; }
+.eis-cells div { display: flex; flex-direction: column; gap: 0.1rem; }
+.eis-cells span { font-size: 0.72rem; color: var(--text-muted); }
+.eis-cells strong { font-size: 1rem; color: var(--text-primary); }
+.eis-cells em { font-style: normal; font-size: 0.72rem; font-weight: 600; color: #B87714; }
+.eis-link { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 600; color: var(--primary-600); text-decoration: none; }
+.eis-link:hover { text-decoration: underline; }
 
-.template-btn:hover {
-  background: var(--primary-50);
+@media (max-width: 720px) {
+  .filter-row { flex-wrap: wrap; }
+  .search-wrap { flex-basis: 100%; }
 }

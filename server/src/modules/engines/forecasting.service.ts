@@ -12,6 +12,7 @@
 import prisma from "../../lib/prisma";
 import { FinancialState } from "./financialState.service";
 import { monthRange } from "../../lib/dateHelpers";
+import { isFixedExpense } from "../../lib/finance";
 
 export interface CategoryForecast {
   category:       string;
@@ -71,7 +72,13 @@ export const runForecastingEngine = async (
   const recent7MonthlyEst = recent7DailyAvg * totalDaysInMonth;
 
   // ── Current month velocity projection ────────────────────────────────────────
-  const currentVelocityMonthly = avgDailySpending * totalDaysInMonth;
+  // Fixed commitments (rent, EMI, recurring bills) happen once a month, so they
+  // are counted as-is; only day-to-day spending is extrapolated by velocity.
+  const fixedSpent = state.fixedSpent ?? 0;
+  const discretionarySpent = state.discretionarySpent ?? Math.max(state.totalSpent - fixedSpent, 0);
+  const currentVelocityMonthly = state.fixedSpent !== undefined && daysPassedInMonth > 0
+    ? fixedSpent + (discretionarySpent / daysPassedInMonth) * totalDaysInMonth
+    : avgDailySpending * totalDaysInMonth;
 
   // ── Weighted projection ───────────────────────────────────────────────────────
   const projected = Math.round(
@@ -80,25 +87,32 @@ export const runForecastingEngine = async (
     0.20 * recent7MonthlyEst
   );
 
-  // ── Velocity change vs last month ────────────────────────────────────────────
+  // ── Velocity change vs last month (day-to-day spending pace) ─────────────────
+  // Rent/EMI land on day 1, so comparing *total* daily averages makes every
+  // month look "faster" early on. Compare discretionary pace instead.
   let prevM = month - 1;
   let prevY = year;
   if (prevM <= 0) { prevM = 12; prevY -= 1; }
   const { start: ps, end: pe } = monthRange(prevM, prevY);
-  const prevRows = await prisma.expense.aggregate({
+  const prevRows = await prisma.expense.findMany({
     where:  { userId, spentAt: { gte: ps, lte: pe } },
-    _sum:   { amount: true },
+    select: { amount: true, category: true, isRecurring: true },
   });
-  const prevTotal = Number(prevRows._sum.amount ?? 0);
-  const prevDailyAvg = prevTotal / new Date(prevY, prevM, 0).getDate();
+  const prevDays = new Date(prevY, prevM, 0).getDate();
+  const prevDiscretionary = prevRows
+    .filter((e) => !isFixedExpense(e))
+    .reduce((s, e) => s + Number(e.amount), 0);
+  const prevDailyAvg = prevDiscretionary / prevDays;
+  const curDailyAvg  = daysPassedInMonth > 0 ? discretionarySpent / daysPassedInMonth : 0;
   const velocityChange = prevDailyAvg > 0
-    ? Math.round(((avgDailySpending - prevDailyAvg) / prevDailyAvg) * 100)
+    ? Math.round(((curDailyAvg - prevDailyAvg) / prevDailyAvg) * 100)
     : 0;
 
   // ── Per-category forecasts ────────────────────────────────────────────────────
   const categoryForecasts: CategoryForecast[] = state.categories.map((cat) => {
-    const catDailyAvg   = daysPassedInMonth > 0 ? cat.spent / daysPassedInMonth : 0;
-    const catProjected  = Math.round(catDailyAvg * totalDaysInMonth);
+    const catFixed      = cat.fixedSpent ?? 0;
+    const catDailyAvg   = daysPassedInMonth > 0 ? (cat.spent - catFixed) / daysPassedInMonth : 0;
+    const catProjected  = Math.round(catFixed + catDailyAvg * totalDaysInMonth);
     const excess        = catProjected - cat.budget;
     return {
       category:       cat.category,
@@ -115,8 +129,8 @@ export const runForecastingEngine = async (
     currentBudget:             totalBudget,
     expectedExcess:            projected - totalBudget,
     willExceedBudget:          projected > totalBudget,
-    previousAvgDailySpending:  Math.round(prevDailyAvg),
-    currentAvgDailySpending:   Math.round(avgDailySpending),
+    previousAvgDailySpending:  Math.round(prevDailyAvg),   // day-to-day spending / day
+    currentAvgDailySpending:   Math.round(curDailyAvg),
     velocityChangePercent:     velocityChange,
     categoryForecasts,
   };

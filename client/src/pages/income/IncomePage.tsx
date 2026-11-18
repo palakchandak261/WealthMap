@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, DollarSign, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, AlertCircle, Upload } from 'lucide-react';
 import api from '../../services/api';
+import ImportDataModal from '../../components/import/ImportDataModal';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { Income } from '../../types';
@@ -18,6 +19,7 @@ const IncomePage: React.FC = () => {
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showImport, setShowImport] = useState(false);
 
   const fetch = async () => {
     setLoading(true);
@@ -75,11 +77,17 @@ const IncomePage: React.FC = () => {
             <h1>Income</h1>
             <p>Track allowances, scholarships, stipends and part-time income</p>
           </div>
-          <button id="btn-add-income" className="btn btn-primary" onClick={openAdd}>
-            <Plus size={16} /> Add Income
-          </button>
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+              <Upload size={16} /> Import Excel / CSV
+            </button>
+            <button id="btn-add-income" className="btn btn-primary" onClick={openAdd}>
+              <Plus size={16} /> Add Income
+            </button>
+          </div>
         </div>
       </div>
+      <ImportDataModal open={showImport} onClose={() => setShowImport(false)} onImported={() => fetch()} defaultSection="incomes" />
 
       {error && !showModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 

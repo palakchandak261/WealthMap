@@ -12,6 +12,10 @@ import { ForecastResult } from "../modules/engines/forecasting.service";
 import { RiskResult } from "../modules/engines/risk.service";
 import { runSimulation } from "../modules/engines/simulation.service";
 import { daysInMonth, daysPassed, daysRemaining, monthRange } from "../lib/dateHelpers";
+import {
+  inflate, buildGoalPlan, monthsToReach, buildSavingsPlan, buildYearlyProjection, buildAppreciation,
+} from "../lib/finance";
+import { parseAdviceJson } from "../modules/ai/ai.service";
 
 // ── Tiny test harness ─────────────────────────────────────────────────────────
 let passed = 0;
@@ -346,6 +350,129 @@ test("velocity change %: (1400-1200)/1200 × 100 = 16.67% ≈ 17%", () => {
   const curr = 1400, prev = 1200;
   const change = Math.round(((curr - prev) / prev) * 100);
   expect(change).toBe(17);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLANNING MATH — inflation, goal plans, allocation, appreciation
+// ─────────────────────────────────────────────────────────────────────────────
+const NOW = new Date(2026, 0, 15, 12);   // 15 Jan 2026
+const inMonths = (m: number) => new Date(2026, m, 15, 12);
+
+test("inflate: ₹1,00,000 at 6% for 2 years = ₹1,12,360", () => {
+  expect(Math.round(inflate(100000, 6, 2))).toBe(112360);
+});
+
+test("goal plan: future target uses category inflation (EDUCATION 10%)", () => {
+  const plan = buildGoalPlan({
+    id: "g1", name: "MBA", targetAmount: 100000, currentAmount: 0, deadline: inMonths(12),
+    status: "ACTIVE", category: "EDUCATION", createdAt: NOW,
+  }, { now: NOW });
+  expect(plan.inflationRate).toBe(10);
+  expect(plan.futureTarget).toBeCloseTo(110000, 50);
+  expect(plan.monthsLeft).toBe(12);
+  expect(plan.requiredMonthly).toBe(Math.ceil(plan.futureTarget / 12));
+  expect(plan.requiredMonthlyNoInflation).toBe(Math.ceil(100000 / 12));
+});
+
+test("goal plan: flat rate override and inflation-off", () => {
+  const goal = { id: "g", name: "Trip", targetAmount: 50000, currentAmount: 10000, deadline: inMonths(24), status: "ACTIVE", category: "TRAVEL", createdAt: NOW };
+  expect(buildGoalPlan(goal, { now: NOW, flatRate: 4 }).inflationRate).toBe(4);
+  const off = buildGoalPlan(goal, { now: NOW, inflationEnabled: false });
+  expect(off.futureTarget).toBe(50000);
+  expect(off.requiredMonthly).toBe(Math.ceil(40000 / 24));
+});
+
+test("goal plan: BEHIND when pace is too slow, ON_TRACK when fast enough", () => {
+  const base = { id: "g", name: "Laptop", targetAmount: 120000, currentAmount: 20000, deadline: inMonths(10), status: "ACTIVE", category: "GADGET", createdAt: new Date(2025, 6, 15) };
+  const contributions = (amt: number) => [0, 1, 2, 3, 4, 5].map((k) => ({ amount: amt, contributedAt: new Date(2026, -k, 10) }));
+  const slow = buildGoalPlan({ ...base, contributions: contributions(3000) }, { now: NOW });
+  const fast = buildGoalPlan({ ...base, contributions: contributions(15000) }, { now: NOW });
+  expect(slow.status).toBe("BEHIND");
+  expect(slow.monthsBehind).toBeGreaterThan(0);
+  expect(fast.status).toBe("ON_TRACK");
+});
+
+test("goal plan: completed goal needs nothing", () => {
+  const p = buildGoalPlan({ id: "g", name: "Phone", targetAmount: 40000, currentAmount: 40000, deadline: inMonths(2), status: "ACTIVE", category: "GADGET", createdAt: NOW }, { now: NOW });
+  expect(p.status).toBe("COMPLETED");
+  expect(p.remaining).toBe(0);
+});
+
+test("monthsToReach accounts for a growing (inflating) target", () => {
+  expect(monthsToReach(12000, 0, 1000, 0)).toBe(12);
+  expect(monthsToReach(12000, 0, 1000, 10)! > 12).toBeTruthy();
+  expect(monthsToReach(12000, 0, 0, 6)).toBe(null);
+});
+
+test("savings plan: HIGH priority funded first, shortfall reported", () => {
+  const mk = (id: string, priority: "HIGH" | "MEDIUM" | "LOW", m: number) => buildGoalPlan(
+    { id, name: id, targetAmount: 100000, currentAmount: 0, deadline: inMonths(m), status: "ACTIVE", category: "OTHER", priority, inflationRate: 0, createdAt: NOW }, { now: NOW });
+  const plan = buildSavingsPlan([mk("low", "LOW", 10), mk("high", "HIGH", 10)], 12000, NOW);
+  expect(plan.allocations[0].goalId).toBe("high");
+  expect(plan.allocations[0].allocated).toBe(10000);
+  expect(plan.allocations[1].allocated).toBe(2000);
+  expect(plan.shortfall).toBe(8000);
+  expect(!!plan.allocations[1].suggestedDeadline).toBeTruthy();
+});
+
+test("yearly projection: uses past-month history and category inflation", () => {
+  const exp = [
+    { category: "FOOD", amount: 10000, spentAt: new Date(2025, 11, 5), isRecurring: false },
+    { category: "RENT", amount: 20000, spentAt: new Date(2025, 11, 1), isRecurring: true },
+  ];
+  const y = buildYearlyProjection(exp, { now: NOW });
+  expect(y.basis).toBe("HISTORY");
+  expect(y.annualBaseline).toBe(360000);
+  const next = y.projections.find((p) => p.years === 1)!;
+  expect(next.annual).toBe(Math.round(120000 * 1.07 + 240000 * 1.07));
+});
+
+test("yearly projection: current month counts rent once, extrapolates the rest", () => {
+  const exp = [
+    { category: "RENT", amount: 20000, spentAt: new Date(2026, 0, 1), isRecurring: true },
+    { category: "FOOD", amount: 3000, spentAt: new Date(2026, 0, 10), isRecurring: false },
+  ];
+  const y = buildYearlyProjection(exp, { now: NOW, daysPassed: 15, totalDays: 30 });
+  expect(y.basis).toBe("CURRENT_MONTH");
+  expect(y.monthlyBaseline).toBe(26000);   // 20000 + 3000/15×30
+});
+
+test("appreciation: spending under safe-to-spend earns praise", () => {
+  const a = buildAppreciation({
+    monthExpenses: [
+      { category: "RENT", amount: 20000, spentAt: new Date(2026, 0, 1), isRecurring: true },
+      { category: "FOOD", amount: 3000, spentAt: new Date(2026, 0, 5), isRecurring: false },
+    ],
+    totalBudget: 50000, dueThisMonthAmount: 0, daysPassed: 15, totalDays: 30, now: NOW, topGoalName: "MBA",
+  });
+  // allowance = 50000 − 20000 − 5000 buffer = 25000 → 833/day → 12,500 to date
+  expect(a.monthlySafeAllowance).toBe(25000);
+  expect(a.eligible).toBeTruthy();
+  expect(a.savedSoFar).toBe(9500);
+  expect(a.level).toBe("CHAMPION");
+  expect(a.streakDays).toBe(10);
+  expect((a.suggestion ?? "").includes("MBA")).toBeTruthy();
+});
+
+test("appreciation: overspending gives a catch-up target instead", () => {
+  const a = buildAppreciation({
+    monthExpenses: [{ category: "SHOPPING", amount: 20000, spentAt: new Date(2026, 0, 14), isRecurring: false }],
+    totalBudget: 30000, dueThisMonthAmount: 0, daysPassed: 15, totalDays: 30, now: NOW,
+  });
+  expect(a.level).toBe("OVER");
+  expect(a.eligible).toBeFalsy();
+});
+
+test("appreciation: no budget → NO_BUDGET", () => {
+  const a = buildAppreciation({ monthExpenses: [], totalBudget: 0, dueThisMonthAmount: 0, daysPassed: 5, totalDays: 30, now: NOW });
+  expect(a.level).toBe("NO_BUDGET");
+});
+
+test("AI JSON parser tolerates code fences and bad categories", () => {
+  const parsed = parseAdviceJson('```json\n{"summary":"Hi","insights":[{"title":"Save","detail":"Save ₹5,000","category":"weird","amount":5000}]}\n```');
+  expect(parsed?.insights.length).toBe(1);
+  expect(parsed?.insights[0].category).toBe("SAVING");
+  expect(parseAdviceJson("not json")).toBe(null);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

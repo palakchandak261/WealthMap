@@ -4,6 +4,7 @@ import RegisterPage from '../RegisterPage';
 import { AuthProvider } from '../../../context/AuthContext';
 
 vi.mock('../../../services/api', () => ({
+  isDemoMode: () => false,
   default: {
     post: vi.fn(),
     get: vi.fn(() => Promise.resolve({ data: { success: false } }))

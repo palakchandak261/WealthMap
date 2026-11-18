@@ -77,6 +77,19 @@ export interface Obligation {
 }
 
 export type GoalStatus = 'ACTIVE' | 'COMPLETED' | 'PAUSED' | 'ABANDONED';
+export type GoalPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export type GoalCategory =
+  | 'EMERGENCY' | 'EDUCATION' | 'TRAVEL' | 'GADGET' | 'VEHICLE'
+  | 'HOME' | 'WEDDING' | 'HEALTH' | 'RETIREMENT' | 'OTHER';
+
+export interface GoalContribution {
+  id: string;
+  goalId: string;
+  userId?: string;
+  amount: number;
+  note?: string | null;
+  contributedAt: string;
+}
 
 export interface Goal {
   id: string;
@@ -84,10 +97,123 @@ export interface Goal {
   name: string;
   targetAmount: number;
   currentAmount: number;
-  deadline?: string;
+  deadline?: string | null;
   status: GoalStatus;
+  category?: GoalCategory | string;
+  priority?: GoalPriority;
+  inflationRate?: number | null;   // custom % p.a.; null → category default
+  contributions?: GoalContribution[];
+  plan?: GoalPlan;
   createdAt: string;
   updatedAt: string;
+}
+
+// ── Planning (inflation, goal plans, appreciation) ────────────────────────────
+
+export type GoalPlanStatus = 'COMPLETED' | 'ON_TRACK' | 'BEHIND' | 'NOT_STARTED' | 'OVERDUE' | 'NO_DEADLINE';
+
+export interface GoalPlan {
+  goalId: string;
+  name: string;
+  category: GoalCategory;
+  priority: GoalPriority;
+  inflationRate: number;
+  baseTarget: number;
+  futureTarget: number;
+  inflationCost: number;
+  current: number;
+  remaining: number;
+  progressPct: number;
+  deadline: string | null;
+  monthsLeft: number | null;
+  requiredMonthly: number | null;
+  requiredMonthlyNoInflation: number | null;
+  monthlyPace: number;
+  projectedCompletion: string | null;
+  monthsBehind: number;
+  status: GoalPlanStatus;
+  advice: string;
+}
+
+export interface GoalAllocation {
+  goalId: string;
+  name: string;
+  priority: GoalPriority;
+  required: number;
+  allocated: number;
+  shortfall: number;
+  suggestedDeadline: string | null;
+}
+
+export interface SavingsPlan {
+  monthlyCapacity: number;
+  totalRequired: number;
+  totalAllocated: number;
+  surplus: number;
+  shortfall: number;
+  allocations: GoalAllocation[];
+  summary: string;
+}
+
+export interface YearlyProjection {
+  basis: 'HISTORY' | 'CURRENT_MONTH' | 'NONE';
+  monthsOfHistory: number;
+  monthlyBaseline: number;
+  annualBaseline: number;
+  blendedRate: number;
+  categories: { category: string; monthly: number; annual: number; rate: number }[];
+  projections: { years: number; label: string; annual: number; monthly: number; increase: number; increasePct: number }[];
+  purchasingPower: { years: number; valueOfOneLakh: number }[];
+}
+
+export type AppreciationLevel = 'CHAMPION' | 'GREAT' | 'GOOD' | 'OVER' | 'NO_BUDGET';
+
+export interface SpendingAppreciation {
+  level: AppreciationLevel;
+  eligible: boolean;
+  title: string;
+  message: string;
+  monthlySafeAllowance: number;
+  dailyAllowance: number;
+  allowanceToDate: number;
+  discretionarySpent: number;
+  savedSoFar: number;
+  savedPct: number;
+  todaySpent: number;
+  todayRemaining: number;
+  streakDays: number;
+  daysWithinLimit: number;
+  daysPassed: number;
+  projectedMonthEndSaving: number;
+  suggestion: string | null;
+}
+
+export interface PlanningSnapshot {
+  inflationRate: number | null;
+  monthlyIncome: number;
+  expectedMonthlySpend: number;
+  dueThisMonth: number;
+  monthlySavingsCapacity: number;
+  goalPlans: GoalPlan[];
+  savingsPlan: SavingsPlan;
+  yearlyProjection: YearlyProjection;
+  appreciation: SpendingAppreciation | null;
+}
+
+// ── Import (CSV / Excel / JSON) ───────────────────────────────────────────────
+
+export interface ImportCounts {
+  expenses: number;
+  incomes: number;
+  obligations: number;
+  goals: number;
+  budgets: number;
+}
+
+export interface ImportResult {
+  created: ImportCounts;
+  skipped: ImportCounts;
+  total: number;
 }
 
 // ── Engine / Intelligence types ───────────────────────────────────────────────
@@ -112,17 +238,22 @@ export interface FinancialState {
   daysPassedInMonth: number;
   daysRemainingInMonth: number;
   totalDaysInMonth: number;
-  upcomingObligations: Obligation[];
+  upcomingObligations: Pick<Obligation, 'id' | 'name' | 'amount' | 'dueDate' | 'type'>[];
   totalUpcomingAmount: number;
+  dueThisMonthAmount?: number;
+  fixedSpent?: number;
+  discretionarySpent?: number;
   safeSpendableAmount: number;
   safeDailySpending: number;
   activeGoals: { id: string; name: string; progress: number; remaining: number }[];
+  appreciation?: SpendingAppreciation;
 }
 
 export interface FinancialCategoryState {
   category: string;
   budget: number;
   spent: number;
+  fixedSpent?: number;
   remaining: number;
   utilization: number;
   status: 'NORMAL' | 'WARNING' | 'CRITICAL' | 'EXHAUSTED' | 'EXCEEDED';
@@ -192,6 +323,8 @@ export interface SafeToSpendResult {
   daysRemaining: number;
   budgetRemaining: number;
   upcomingObligations: number;
+  dueThisMonth?: number;
+  appreciation?: SpendingAppreciation | null;
 }
 
 export interface DependencyGraph {
@@ -264,14 +397,33 @@ export interface Anomaly {
   severity: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
+export type InsightCategory = 'GOAL' | 'SAVING' | 'SPENDING' | 'INFLATION' | 'RISK' | 'APPRECIATION';
+
+export interface AIInsight {
+  title: string;
+  detail: string;
+  category: InsightCategory;
+  amount?: number | null;
+}
+
 export interface AIRecommendation {
+  summary?: string;
+  insights?: AIInsight[];
   recommendations: string[];
+  source?: 'gemini' | 'openai' | 'rules';
+  model?: string | null;
+  fallbackReason?: string;
+  goalPlans?: GoalPlan[];
+  savingsPlan?: SavingsPlan;
+  appreciation?: SpendingAppreciation | null;
+  yearly?: { annualBaseline: number; nextYear: number; blendedRate: number };
   context: {
     riskScore: number;
     riskLevel: RiskLevel;
     healthScore: number;
     healthGrade: string;
     willExceedBudget: boolean;
+    monthlySavingsCapacity?: number;
   };
 }
 

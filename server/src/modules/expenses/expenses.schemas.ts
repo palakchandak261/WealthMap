@@ -12,3 +12,16 @@ export const CreateExpenseSchema = z.object({
 });
 
 export const UpdateExpenseSchema = CreateExpenseSchema.partial();
+
+// Accepts { items: [...] } or a bare array of expenses (CSV / Excel upload)
+export const BulkExpensesSchema = z.preprocess(
+  (body) => (Array.isArray(body) ? { items: body } : body),
+  z.object({
+    items: z.array(
+      CreateExpenseSchema.extend({
+        category: z.string().trim().min(1).max(40).transform((s) => s.toUpperCase()),
+        spentAt:  z.string().refine((v) => !Number.isNaN(new Date(v).getTime()), "must be a valid date"),
+      })
+    ).min(1, "No expenses to import").max(5000),
+  })
+);

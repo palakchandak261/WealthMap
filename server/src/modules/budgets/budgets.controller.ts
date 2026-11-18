@@ -3,6 +3,7 @@ import { AuthRequest } from "../../middleware/authenticate";
 import { ok } from "../../lib/response";
 import {
   createBudgetService,
+  listBudgetsService,
   getCurrentBudgetService,
   getBudgetByIdService,
   updateBudgetService,
@@ -11,6 +12,11 @@ import {
 
 export const createBudget = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try { ok(res, await createBudgetService(req.userId!, req.body), "Budget saved", 201); }
+  catch (err) { next(err); }
+};
+
+export const listBudgets = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try { ok(res, await listBudgetsService(req.userId!)); }
   catch (err) { next(err); }
 };
 

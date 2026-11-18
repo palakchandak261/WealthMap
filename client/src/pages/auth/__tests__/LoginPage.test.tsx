@@ -5,6 +5,7 @@ import { AuthProvider } from '../../../context/AuthContext';
 
 // Basic mock for API calls
 vi.mock('../../../services/api', () => ({
+  isDemoMode: () => false,
   default: {
     post: vi.fn(),
     get: vi.fn(() => Promise.resolve({ data: { success: false } }))
@@ -25,7 +26,7 @@ describe('LoginPage Component', () => {
   it('renders the login form correctly', () => {
     renderWithProviders(<LoginPage />);
     
-    expect(screen.getByText('Welcome back')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to WealthMap')).toBeInTheDocument();
     expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();

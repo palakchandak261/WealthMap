@@ -7,7 +7,6 @@ import {
   ChevronRight, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { resetMockStore } from '../../services/mockData';
 import './Layout.css';
 
 interface NavItem {
@@ -131,13 +130,13 @@ const pageTitles: Record<string, string> = {
 };
 
 const Topbar: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => {
-  const { user } = useAuth();
+  const { user, isDemo, startDemo } = useAuth();
   const { pathname } = useLocation();
   const pageTitle = pageTitles[pathname] ?? 'Your workspace';
 
   const handleResetDemo = () => {
-    resetMockStore();
-    localStorage.setItem('wm_demo_mode', 'true');
+    if (!window.confirm('Reset the demo workspace to fresh sample data? Changes you made in the demo will be lost.')) return;
+    startDemo();
     window.location.reload();
   };
 
@@ -153,15 +152,21 @@ const Topbar: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => {
         </div>
       </div>
       <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-        <button
-          className="btn btn-secondary btn-sm"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', padding: '0.35rem 0.65rem' }}
-          onClick={handleResetDemo}
-          title="Reload fresh demo mock data"
-        >
-          <Sparkles size={13} color="var(--primary-600)" />
-          <RefreshCw size={11} /> Demo Data
-        </button>
+        {isDemo && (
+          <>
+            <span className="demo-pill" title="You are exploring offline sample data stored in this browser">
+              <Sparkles size={12} /> Demo mode
+            </span>
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', padding: '0.35rem 0.65rem' }}
+              onClick={handleResetDemo}
+              title="Reset the demo to fresh sample data"
+            >
+              <RefreshCw size={11} /> Reset demo
+            </button>
+          </>
+        )}
 
         <div className="topbar-user-copy">
           <span className="topbar-user-greeting">Signed in as</span>

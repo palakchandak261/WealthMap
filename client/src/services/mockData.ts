@@ -1,17 +1,92 @@
 /**
- * WealthMap Demo & Mock Data Store
- * Provides realistic, comprehensive mock financial data for instant demoing,
- * offline presentations, and automated fallback when the backend or database is offline.
+ * WealthMap Demo Data Store (browser-only demo mode)
+ * ──────────────────────────────────────────────────
+ * Generates the SAME dataset as server/prisma/seed.ts, relative to today, so
+ * demo mode and the real backend tell the same story:
+ *   • 3 months of expense history + the current month
+ *   • salary / freelance income, current-month budget, obligations
+ *   • prioritised goals with monthly contribution history
+ *
+ * Everything lives in localStorage; the engines in demoEngine.ts compute every
+ * number from it exactly like the backend does.
  */
 
 import type {
-  User, Income, Expense, Budget, Obligation, Goal,
-  FinancialState, ForecastResult, RiskResult, HealthScoreResult,
-  DependencyGraph
+  User, Income, Expense, Budget, Obligation, Goal, GoalContribution,
+  GoalPriority, GoalStatus,
 } from '../types';
 
+export const DEMO_USER_ID = 'demo-user-123';
+const STORE_VERSION = 2;
+const MOCK_STORE_KEY = 'wm_demo_mock_data';
+
+export interface MockStore {
+  version: number;
+  generatedFor: string;            // "YYYY-M" — data is regenerated each new month
+  user: User;
+  incomes: Income[];
+  budgets: Budget[];
+  expenses: Expense[];
+  obligations: Obligation[];
+  goals: Goal[];
+  goalContributions: GoalContribution[];
+}
+
+type Method = Expense['paymentMethod'];
+type Row = [day: number, category: string, amount: number, description: string, method: Method, recurring: boolean];
+
+// Keep in sync with server/prisma/seed.ts
+const MONTH_TEMPLATE: Row[] = [
+  [1,  'RENT',          20000, 'Monthly apartment rent',            'NET_BANKING', true],
+  [2,  'FOOD',           1850, 'Weekly groceries – Nature Basket',  'UPI',         false],
+  [3,  'TRANSPORT',       450, 'Metro card recharge',               'UPI',         false],
+  [4,  'ENTERTAINMENT',   499, 'Spotify + cloud storage',           'CARD',        true],
+  [5,  'FOOD',            850, 'Team lunch with classmates',        'CARD',        false],
+  [7,  'UTILITIES',      2100, 'Electricity & Wi-Fi bill',          'NET_BANKING', true],
+  [9,  'TRANSPORT',       650, 'Uber to campus',                    'UPI',         false],
+  [10, 'FOOD',           1850, 'Organic veggies & dairy',           'UPI',         false],
+  [12, 'ENTERTAINMENT',   900, 'Movie night & snacks',              'CARD',        false],
+  [14, 'SHOPPING',       1199, 'Reference textbooks & stationery',  'CARD',        false],
+  [16, 'FOOD',            420, 'Café study session',                'UPI',         false],
+  [18, 'FOOD',           1650, 'Weekly groceries',                  'UPI',         false],
+  [21, 'TRANSPORT',       380, 'Auto rickshaw rides',               'CASH',        false],
+  [23, 'SHOPPING',       1899, 'Running shoes',                     'CARD',        false],
+  [25, 'FOOD',            950, 'Dinner with friends',               'UPI',         false],
+  [27, 'HEALTH',          640, 'Pharmacy – vitamins',               'UPI',         false],
+  [28, 'FOOD',           1500, 'Groceries top-up',                  'UPI',         false],
+];
+
+const HISTORY: { monthsAgo: number; factor: number; extra?: Row }[] = [
+  { monthsAgo: 3, factor: 1.0 },
+  { monthsAgo: 2, factor: 1.12, extra: [19, 'TRAVEL',   6500, 'Weekend trip to Lonavala', 'UPI',  false] },
+  { monthsAgo: 1, factor: 1.06, extra: [20, 'SHOPPING', 3499, 'Festival shopping',        'CARD', false] },
+];
+
+const GOALS: {
+  name: string; category: string; priority: GoalPriority; target: number; current: number;
+  deadlineMonths: number; createdMonthsAgo: number; monthly: number; contributions: number; status?: GoalStatus;
+}[] = [
+  { name: 'Emergency Buffer Fund (6 Months)', category: 'EMERGENCY', priority: 'HIGH',   target: 180000, current: 110000, deadlineMonths: 8,  createdMonthsAgo: 10, monthly: 10000, contributions: 6 },
+  { name: 'MBA / Higher Studies Fund',        category: 'EDUCATION', priority: 'HIGH',   target: 600000, current: 90000,  deadlineMonths: 36, createdMonthsAgo: 8,  monthly: 15000, contributions: 6 },
+  { name: 'M4 MacBook Pro & Dev Setup',       category: 'GADGET',    priority: 'MEDIUM', target: 150000, current: 60000,  deadlineMonths: 10, createdMonthsAgo: 6,  monthly: 10000, contributions: 6 },
+  { name: 'Japan Graduation Trip 🌸',          category: 'TRAVEL',    priority: 'MEDIUM', target: 250000, current: 75000,  deadlineMonths: 18, createdMonthsAgo: 5,  monthly: 9000,  contributions: 5 },
+  { name: 'EV Car Down Payment',              category: 'VEHICLE',   priority: 'LOW',    target: 400000, current: 65000,  deadlineMonths: 40, createdMonthsAgo: 4,  monthly: 4000,  contributions: 4 },
+  { name: 'New Smartphone',                   category: 'GADGET',    priority: 'LOW',    target: 45000,  current: 45000,  deadlineMonths: -1, createdMonthsAgo: 4,  monthly: 15000, contributions: 3, status: 'COMPLETED' },
+];
+
+const at = (y: number, m: number, d: number) => new Date(y, m, d, 12, 0, 0).toISOString();
+const roundTo10 = (n: number) => Math.round(n / 10) * 10;
+const monthsFromNow = (months: number) => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + months, Math.min(now.getDate(), 28), 12);
+};
+const monthKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}`;
+
+export const newId = (prefix: string) =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
 export const INITIAL_DEMO_USER: User = {
-  id: 'demo-user-123',
+  id: DEMO_USER_ID,
   name: 'Demo Student / User',
   email: 'demo@wealthmap.app',
   currency: 'INR',
@@ -20,325 +95,131 @@ export const INITIAL_DEMO_USER: User = {
   emergencyFundBalance: 50000,
   declaredMonthlyIncome: 75000,
   onboardingComplete: true,
-  createdAt: new Date('2026-08-01').toISOString(),
+  createdAt: monthsFromNow(-10).toISOString(),
   updatedAt: new Date().toISOString(),
 };
 
-export const INITIAL_DEMO_INCOMES: Income[] = [
-  {
-    id: 'inc-1',
-    userId: 'demo-user-123',
-    source: 'Tech Internship / Salary',
-    amount: 75000,
-    frequency: 'MONTHLY',
-    isRecurring: true,
-    receivedAt: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'inc-2',
-    userId: 'demo-user-123',
-    source: 'Freelance Design & Tutoring',
-    amount: 15000,
-    frequency: 'MONTHLY',
-    isRecurring: false,
-    receivedAt: new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-export const INITIAL_DEMO_BUDGET: Budget = {
-  id: 'b-1',
-  userId: 'demo-user-123',
-  month: new Date().getMonth() + 1,
-  year: new Date().getFullYear(),
-  totalBudget: 52000,
-  categoryBudgets: [
-    { id: 'cb-1', budgetId: 'b-1', category: 'FOOD', limit: 12000, createdAt: '', updatedAt: '' },
-    { id: 'cb-2', budgetId: 'b-1', category: 'RENT', limit: 20000, createdAt: '', updatedAt: '' },
-    { id: 'cb-3', budgetId: 'b-1', category: 'TRANSPORT', limit: 4000, createdAt: '', updatedAt: '' },
-    { id: 'cb-4', budgetId: 'b-1', category: 'ENTERTAINMENT', limit: 5000, createdAt: '', updatedAt: '' },
-    { id: 'cb-5', budgetId: 'b-1', category: 'UTILITIES', limit: 5000, createdAt: '', updatedAt: '' },
-    { id: 'cb-6', budgetId: 'b-1', category: 'SHOPPING', limit: 6000, createdAt: '', updatedAt: '' },
-  ],
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
-
-const d = (daysAgo: number) => {
-  const dt = new Date();
-  dt.setDate(dt.getDate() - daysAgo);
-  return dt.toISOString();
-};
-
-export const INITIAL_DEMO_EXPENSES: Expense[] = [
-  { id: 'exp-1', userId: 'demo-user-123', category: 'RENT', amount: 20000, description: 'Monthly Apartment Rent', paymentMethod: 'NET_BANKING', isRecurring: true, spentAt: d(18), createdAt: d(18), updatedAt: d(18) },
-  { id: 'exp-2', userId: 'demo-user-123', category: 'FOOD', amount: 2450, description: 'Weekly groceries at Nature Basket', paymentMethod: 'UPI', isRecurring: false, spentAt: d(16), createdAt: d(16), updatedAt: d(16) },
-  { id: 'exp-3', userId: 'demo-user-123', category: 'TRANSPORT', amount: 650, description: 'Uber to University Campus', paymentMethod: 'UPI', isRecurring: false, spentAt: d(14), createdAt: d(14), updatedAt: d(14) },
-  { id: 'exp-4', userId: 'demo-user-123', category: 'FOOD', amount: 1200, description: 'Team lunch with classmates', paymentMethod: 'CARD', isRecurring: false, spentAt: d(12), createdAt: d(12), updatedAt: d(12) },
-  { id: 'exp-5', userId: 'demo-user-123', category: 'UTILITIES', amount: 2100, description: 'Electricity & High-speed WiFi Bill', paymentMethod: 'NET_BANKING', isRecurring: true, spentAt: d(10), createdAt: d(10), updatedAt: d(10) },
-  { id: 'exp-6', userId: 'demo-user-123', category: 'ENTERTAINMENT', amount: 1500, description: 'IMAX Cinema & Snacks', paymentMethod: 'CARD', isRecurring: false, spentAt: d(8), createdAt: d(8), updatedAt: d(8) },
-  { id: 'exp-7', userId: 'demo-user-123', category: 'FOOD', amount: 1850, description: 'Organic veggies & dairy groceries', paymentMethod: 'UPI', isRecurring: false, spentAt: d(6), createdAt: d(6), updatedAt: d(6) },
-  { id: 'exp-8', userId: 'demo-user-123', category: 'SHOPPING', amount: 1499, description: 'Reference textbooks & stationery', paymentMethod: 'CARD', isRecurring: false, spentAt: d(4), createdAt: d(4), updatedAt: d(4) },
-  { id: 'exp-9', userId: 'demo-user-123', category: 'TRANSPORT', amount: 450, description: 'Metro card monthly recharge', paymentMethod: 'UPI', isRecurring: false, spentAt: d(3), createdAt: d(3), updatedAt: d(3) },
-  { id: 'exp-10', userId: 'demo-user-123', category: 'FOOD', amount: 420, description: 'Café coffee & snacks study session', paymentMethod: 'UPI', isRecurring: false, spentAt: d(1), createdAt: d(1), updatedAt: d(1) },
-  { id: 'exp-11', userId: 'demo-user-123', category: 'ENTERTAINMENT', amount: 499, description: 'Spotify + Cloud Storage Subscription', paymentMethod: 'CARD', isRecurring: true, spentAt: d(20), createdAt: d(20), updatedAt: d(20) },
-];
-
-export const INITIAL_DEMO_OBLIGATIONS: Obligation[] = [
-  { id: 'obl-1', userId: 'demo-user-123', name: 'Apartment Rent', type: 'RENT', amount: 20000, dueDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(), frequency: 'MONTHLY', isRecurring: true, isPaid: false, createdAt: '', updatedAt: '' },
-  { id: 'obl-2', userId: 'demo-user-123', name: 'Student Laptop EMI', type: 'EMI', amount: 4500, dueDate: new Date(new Date().getFullYear(), new Date().getMonth(), 28).toISOString(), frequency: 'MONTHLY', isRecurring: true, isPaid: false, createdAt: '', updatedAt: '' },
-  { id: 'obl-3', userId: 'demo-user-123', name: 'Health & Medical Insurance', type: 'INSURANCE', amount: 12000, dueDate: new Date(new Date().getFullYear(), 11, 15).toISOString(), frequency: 'YEARLY', isRecurring: true, isPaid: false, createdAt: '', updatedAt: '' },
-  { id: 'obl-4', userId: 'demo-user-123', name: 'Gym & Sports Membership', type: 'SUBSCRIPTION', amount: 1500, dueDate: new Date(new Date().getFullYear(), new Date().getMonth(), 25).toISOString(), frequency: 'MONTHLY', isRecurring: true, isPaid: true, createdAt: '', updatedAt: '' },
-];
-
-export const INITIAL_DEMO_GOALS: Goal[] = [
-  {
-    id: 'goal-1',
-    userId: 'demo-user-123',
-    name: 'Emergency Buffer Fund (6 Months)',
-    targetAmount: 180000,
-    currentAmount: 110000,
-    deadline: '2026-12-31T00:00:00.000Z',
-    status: 'ACTIVE',
-    createdAt: '2026-06-01T00:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'goal-2',
-    userId: 'demo-user-123',
-    name: 'M4 MacBook Pro & Dev Setup',
-    targetAmount: 150000,
-    currentAmount: 60000,
-    deadline: '2027-08-31T00:00:00.000Z',
-    status: 'ACTIVE',
-    createdAt: '2026-07-01T00:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'goal-3',
-    userId: 'demo-user-123',
-    name: 'Japan Graduation Trip 🌸',
-    targetAmount: 250000,
-    currentAmount: 75000,
-    deadline: '2028-04-15T00:00:00.000Z',
-    status: 'ACTIVE',
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'goal-4',
-    userId: 'demo-user-123',
-    name: 'EV Car Down Payment',
-    targetAmount: 400000,
-    currentAmount: 65000,
-    deadline: '2029-12-31T00:00:00.000Z',
-    status: 'ACTIVE',
-    createdAt: '2026-08-15T00:00:00.000Z',
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-// Helper to calculate mock engine metrics dynamically from mock data
-export const computeMockFinancialState = (
-  expenses: Expense[] = INITIAL_DEMO_EXPENSES,
-  budget: Budget = INITIAL_DEMO_BUDGET,
-  obligations: Obligation[] = INITIAL_DEMO_OBLIGATIONS,
-  goals: Goal[] = INITIAL_DEMO_GOALS
-): FinancialState => {
-  const totalBudget = budget.totalBudget;
-  const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const totalRemaining = Math.max(totalBudget - totalSpent, 0);
-
+/** Build a fresh demo dataset relative to today. */
+export const buildDemoStore = (): MockStore => {
   const now = new Date();
-  const passed = Math.max(now.getDate(), 1);
-  const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const remainingDays = Math.max(totalDays - passed, 1);
-  const avgDaily = Math.round(totalSpent / passed);
+  const Y = now.getFullYear();
+  const M = now.getMonth();
+  const today = now.getDate();
+  const stamp = now.toISOString();
+  const uid = DEMO_USER_ID;
 
-  const unpaidObligations = obligations.filter(o => !o.isPaid);
-  const totalUpcomingAmount = unpaidObligations.reduce((s, o) => s + Number(o.amount), 0);
+  // ── Expenses ────────────────────────────────────────────────────────────────
+  const expenses: Expense[] = [];
+  const pushExpense = (spentAt: string, [, category, amount, description, method, recurring]: Row, amt = amount) => {
+    expenses.push({
+      id: `exp-${expenses.length + 1}`, userId: uid, category, amount: amt, description,
+      paymentMethod: method, isRecurring: recurring, spentAt, createdAt: spentAt, updatedAt: spentAt,
+    });
+  };
+  for (const h of HISTORY) {
+    const first = new Date(Y, M - h.monthsAgo, 1);
+    const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    for (const row of [...MONTH_TEMPLATE, ...(h.extra ? [h.extra] : [])]) {
+      pushExpense(at(first.getFullYear(), first.getMonth(), Math.min(row[0], daysIn)), row, row[5] ? row[2] : roundTo10(row[2] * h.factor));
+    }
+  }
+  for (const row of MONTH_TEMPLATE) if (row[0] < today) pushExpense(at(Y, M, row[0]), row);
+  pushExpense(at(Y, M, today), [today, 'FOOD', 180, 'Morning coffee', 'UPI', false]);
+  expenses.sort((a, b) => b.spentAt.localeCompare(a.spentAt));
 
-  const buffer = Math.max(totalBudget * 0.10, 500);
-  const safeSpendableAmount = Math.max(totalRemaining - totalUpcomingAmount - buffer, 0);
-  const safeDailySpending = Math.max(Math.round(safeSpendableAmount / remainingDays), 600);
+  // ── Incomes ─────────────────────────────────────────────────────────────────
+  const incomes: Income[] = [];
+  for (let k = 3; k >= 0; k--) {
+    const d = new Date(Y, M - k, 1);
+    const salaryAt = at(d.getFullYear(), d.getMonth(), 1);
+    incomes.push({ id: `inc-${incomes.length + 1}`, userId: uid, source: 'Tech Internship / Salary', amount: 75000, frequency: 'MONTHLY', isRecurring: true, receivedAt: salaryAt, createdAt: salaryAt, updatedAt: salaryAt });
+    if (k > 0 || today >= 10) {
+      const freeAt = at(d.getFullYear(), d.getMonth(), 10);
+      incomes.push({ id: `inc-${incomes.length + 1}`, userId: uid, source: 'Freelance Design & Tutoring', amount: k === 2 ? 12000 : 15000, frequency: 'MONTHLY', isRecurring: false, receivedAt: freeAt, createdAt: freeAt, updatedAt: freeAt });
+    }
+  }
+  incomes.sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
 
-  const categories = budget.categoryBudgets.map(cb => {
-    const catSpent = expenses
-      .filter(e => e.category === cb.category)
-      .reduce((s, e) => s + Number(e.amount), 0);
-    const rem = cb.limit - catSpent;
-    const util = cb.limit > 0 ? Math.round((catSpent / cb.limit) * 100) : 0;
-    return {
-      category: cb.category,
-      budget: cb.limit,
-      spent: catSpent,
-      remaining: rem,
-      utilization: util,
-      status: (util > 100 ? 'EXCEEDED' : util >= 90 ? 'CRITICAL' : util >= 75 ? 'WARNING' : 'NORMAL') as any,
-    };
+  // ── Budget (current month) ──────────────────────────────────────────────────
+  const budgetId = `budget-${Y}-${M + 1}`;
+  const limits: [string, number][] = [
+    ['FOOD', 12000], ['RENT', 20000], ['TRANSPORT', 4000], ['ENTERTAINMENT', 5000],
+    ['UTILITIES', 5000], ['SHOPPING', 6000], ['HEALTH', 3000],
+  ];
+  const budgets: Budget[] = [{
+    id: budgetId, userId: uid, month: M + 1, year: Y, totalBudget: 55000,
+    categoryBudgets: limits.map(([category, limit], i) => ({ id: `cb-${i + 1}`, budgetId, category, limit, createdAt: stamp, updatedAt: stamp })),
+    createdAt: stamp, updatedAt: stamp,
+  }];
+
+  // ── Obligations ─────────────────────────────────────────────────────────────
+  const ob = (id: string, name: string, type: Obligation['type'], amount: number, dueDate: string, frequency: Obligation['frequency'], isPaid = false): Obligation =>
+    ({ id, userId: uid, name, type, amount, dueDate, frequency, isRecurring: true, isPaid, createdAt: stamp, updatedAt: stamp });
+  const obligations: Obligation[] = [
+    ob('obl-1', 'Apartment Rent', 'RENT', 20000, at(Y, M + 1, 1), 'MONTHLY'),
+    ob('obl-2', 'Student Laptop EMI', 'EMI', 4500, today < 28 ? at(Y, M, 28) : at(Y, M + 1, 28), 'MONTHLY'),
+    ob('obl-3', 'Mobile Postpaid Bill', 'BILL', 599, new Date(now.getTime() + 5 * 86400000).toISOString(), 'MONTHLY'),
+    ob('obl-4', 'Health & Medical Insurance', 'INSURANCE', 12000, new Date(now.getTime() + 40 * 86400000).toISOString(), 'YEARLY'),
+    ob('obl-5', 'Gym & Sports Membership', 'SUBSCRIPTION', 1500, at(Y, M, Math.min(today, 25)), 'MONTHLY', true),
+  ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+  // ── Goals + contribution history ────────────────────────────────────────────
+  const goals: Goal[] = [];
+  const goalContributions: GoalContribution[] = [];
+  GOALS.forEach((g, i) => {
+    const id = `goal-${i + 1}`;
+    goals.push({
+      id, userId: uid, name: g.name, targetAmount: g.target, currentAmount: g.current,
+      deadline: monthsFromNow(g.deadlineMonths).toISOString(), status: g.status ?? 'ACTIVE',
+      category: g.category, priority: g.priority, inflationRate: null,
+      createdAt: monthsFromNow(-g.createdMonthsAgo).toISOString(), updatedAt: stamp,
+    });
+    for (let k = 0; k < g.contributions; k++) {
+      goalContributions.push({
+        id: `gc-${i + 1}-${k + 1}`, goalId: id, userId: uid, amount: g.monthly, note: 'Monthly auto-save',
+        contributedAt: new Date(monthsFromNow(-k).getTime() - 86400000).toISOString(),
+      });
+    }
   });
 
   return {
-    userId: 'demo-user-123',
-    month: now.getMonth() + 1,
-    year: now.getFullYear(),
-    declaredMonthlyIncome: 75000,
-    totalIncomeThisMonth: 90000,
-    cashBalance: 85000,
-    savingsBalance: 150000,
-    emergencyFundBalance: 50000,
-    totalBudget,
-    totalSpent,
-    totalRemaining,
-    overallUtilization: Math.round((totalSpent / totalBudget) * 100),
-    categories,
-    avgDailySpending: avgDaily,
-    daysPassedInMonth: passed,
-    daysRemainingInMonth: remainingDays,
-    totalDaysInMonth: totalDays,
-    upcomingObligations: unpaidObligations,
-    totalUpcomingAmount,
-    safeSpendableAmount,
-    safeDailySpending,
-    activeGoals: goals.filter(g => g.status === 'ACTIVE').map(g => ({
-      id: g.id,
-      name: g.name,
-      progress: Math.min(100, Math.round((g.currentAmount / g.targetAmount) * 100)),
-      remaining: Math.max(g.targetAmount - g.currentAmount, 0),
-    })),
+    version: STORE_VERSION,
+    generatedFor: monthKey(now),
+    user: { ...INITIAL_DEMO_USER, updatedAt: stamp },
+    incomes, budgets, expenses, obligations, goals, goalContributions,
   };
-};
-
-export const getMockRisk = (state: FinancialState): RiskResult => {
-  const isSafe = state.avgDailySpending <= state.safeDailySpending;
-  return {
-    riskScore: isSafe ? 24 : 45,
-    riskLevel: isSafe ? 'LOW' : 'MODERATE',
-    components: {
-      budgetRisk: 22,
-      cashFlowRisk: 20,
-      obligationRisk: 30,
-      velocityRisk: 25,
-      goalRisk: 22,
-    },
-    alerts: [
-      '✅ Safe-to-Spend Discipline: Spending is comfortably below your daily recommended allowance!',
-      'ℹ️ Upcoming laptop EMI of ₹4,500 due on 28th — funds are fully reserved in safe balance.',
-      '🎯 Goals tracking strong: Emergency fund is over 60% funded.',
-    ],
-  };
-};
-
-export const getMockHealth = (): HealthScoreResult => ({
-  total: 88,
-  grade: 'EXCELLENT',
-  components: {
-    budgetAdherence: { score: 90, explanation: 'Spending is strictly inside planned category limits' },
-    cashBuffer: { score: 85, explanation: 'Liquid cash reserves cover 3.2 months of fixed expenses' },
-    obligationCoverage: { score: 92, explanation: 'Obligations are under 28% of monthly income' },
-    spendingStability: { score: 86, explanation: 'Low volatility in daily discretionary spending' },
-    savingsRate: { score: 84, explanation: 'Net savings rate is approximately 32% of monthly earnings' },
-    goalProgress: { score: 91, explanation: 'Regular automated contributions on schedule' },
-  },
-  insights: [
-    'Excellent financial discipline! Your daily spending is well within your safe-to-spend allowance.',
-    'At current savings velocity, you can accelerate your Tech Upgrade goal by 2 months.',
-    'Consider inflation-indexing your 2028 graduation trip target by 6% annually.',
-  ],
-});
-
-export const getMockForecast = (state: FinancialState): ForecastResult => {
-  const projected = state.avgDailySpending * state.totalDaysInMonth;
-  return {
-    projectedMonthlyExpense: projected,
-    currentBudget: state.totalBudget,
-    expectedExcess: Math.max(projected - state.totalBudget, 0),
-    willExceedBudget: projected > state.totalBudget,
-    previousAvgDailySpending: 1650,
-    currentAvgDailySpending: state.avgDailySpending,
-    velocityChangePercent: -12, // 12% reduced spending = positive discipline!
-    categoryForecasts: state.categories.map(c => ({
-      category: c.category,
-      budget: c.budget,
-      spent: c.spent,
-      projected: Math.round(c.spent * 1.3),
-      expectedExcess: Math.max(Math.round(c.spent * 1.3) - c.budget, 0),
-      willExceed: Math.round(c.spent * 1.3) > c.budget,
-    })),
-  };
-};
-
-export const getMockDependencyGraph = (): DependencyGraph => ({
-  nodes: [
-    { id: '1', type: 'INCOME', label: 'Salary + Freelance (₹90,000)', value: 90000, position: { x: 50, y: 150 } },
-    { id: '2', type: 'CASH', label: 'Liquid Cash (₹85,000)', value: 85000, position: { x: 300, y: 150 } },
-    { id: '3', type: 'RENT', label: 'Apartment Rent (₹20,000)', value: 20000, position: { x: 550, y: 50 } },
-    { id: '4', type: 'EMI', label: 'Laptop EMI (₹4,500)', value: 4500, position: { x: 550, y: 130 } },
-    { id: '5', type: 'EXPENSES', label: 'Discretionary Expenses (₹7,900)', value: 7900, position: { x: 550, y: 210 } },
-    { id: '6', type: 'SAVINGS', label: 'Goals & Savings (₹150,000)', value: 150000, position: { x: 550, y: 290 } },
-    { id: '7', type: 'RISK', label: 'Risk Score (24/100 LOW)', value: 24, position: { x: 800, y: 150 } },
-  ],
-  edges: [
-    { id: 'e1', source: '1', target: '2', relationship: 'deposits_into', weight: 1.0, severity: 'LOW' },
-    { id: 'e2', source: '2', target: '3', relationship: 'funds', weight: 0.23, severity: 'MEDIUM' },
-    { id: 'e3', source: '2', target: '4', relationship: 'funds', weight: 0.05, severity: 'LOW' },
-    { id: 'e4', source: '2', target: '5', relationship: 'funds', weight: 0.09, severity: 'LOW' },
-    { id: 'e5', source: '2', target: '6', relationship: 'funds', weight: 0.35, severity: 'LOW' },
-    { id: 'e6', source: '5', target: '7', relationship: 'mitigates', weight: 0.1, severity: 'LOW' },
-  ],
-});
-
-// Local storage keys
-const MOCK_STORE_KEY = 'wm_demo_mock_data';
-
-export interface MockStore {
-  user: User;
-  incomes: Income[];
-  budget: Budget;
-  expenses: Expense[];
-  obligations: Obligation[];
-  goals: Goal[];
-}
-
-export const loadMockStore = (): MockStore => {
-  try {
-    const raw = localStorage.getItem(MOCK_STORE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (err) {
-    console.warn('Failed to parse mock store, resetting', err);
-  }
-  const initial: MockStore = {
-    user: INITIAL_DEMO_USER,
-    incomes: INITIAL_DEMO_INCOMES,
-    budget: INITIAL_DEMO_BUDGET,
-    expenses: INITIAL_DEMO_EXPENSES,
-    obligations: INITIAL_DEMO_OBLIGATIONS,
-    goals: INITIAL_DEMO_GOALS,
-  };
-  saveMockStore(initial);
-  return initial;
 };
 
 export const saveMockStore = (store: MockStore) => {
   try {
     localStorage.setItem(MOCK_STORE_KEY, JSON.stringify(store));
   } catch (e) {
-    console.error('Failed to save mock store', e);
+    console.error('Failed to save demo data', e);
   }
 };
 
 export const resetMockStore = (): MockStore => {
-  const fresh: MockStore = {
-    user: INITIAL_DEMO_USER,
-    incomes: INITIAL_DEMO_INCOMES,
-    budget: INITIAL_DEMO_BUDGET,
-    expenses: INITIAL_DEMO_EXPENSES,
-    obligations: INITIAL_DEMO_OBLIGATIONS,
-    goals: INITIAL_DEMO_GOALS,
-  };
+  const fresh = buildDemoStore();
   saveMockStore(fresh);
   return fresh;
+};
+
+export const clearMockStore = () => {
+  try { localStorage.removeItem(MOCK_STORE_KEY); } catch { /* ignore */ }
+};
+
+/** Load the demo store; regenerates it when the format changed or a new month began. */
+export const loadMockStore = (): MockStore => {
+  try {
+    const raw = localStorage.getItem(MOCK_STORE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as MockStore;
+      if (parsed?.version === STORE_VERSION && parsed.generatedFor === monthKey() && Array.isArray(parsed.expenses)) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('Demo data was unreadable — regenerating', err);
+  }
+  return resetMockStore();
 };

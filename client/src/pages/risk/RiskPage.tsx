@@ -11,6 +11,7 @@ import {
 import api from '../../services/api';
 import { formatCurrency, riskLevelColor } from '../../utils/formatters';
 import type { FinancialState, RiskResult, ForecastResult, SafeToSpendResult, HealthScoreResult } from '../../types';
+import AppreciationCard from '../../components/shared/AppreciationCard';
 import './Risk.css';
 
 const categoryStatusColor = (status: string) => {
@@ -170,11 +171,21 @@ const RiskPage: React.FC = () => {
                   <span style={{ fontWeight: 600 }}>{formatCurrency(safeToSpend.budgetRemaining)}</span>
                 </div>
                 <div className="safe-row">
-                  <span className="text-muted">Obligations (upcoming)</span>
+                  <span className="text-muted">Bills due this month</span>
                   <span style={{ color: 'var(--danger-dark)', fontWeight: 600 }}>
-                    − {formatCurrency(safeToSpend.upcomingObligations)}
+                    − {formatCurrency(safeToSpend.dueThisMonth ?? safeToSpend.upcomingObligations)}
                   </span>
                 </div>
+                {(() => {
+                  const due = safeToSpend.dueThisMonth ?? safeToSpend.upcomingObligations;
+                  const buffer = Math.max(safeToSpend.budgetRemaining - due - safeToSpend.safeSpendableAmount, 0);
+                  return buffer > 0 ? (
+                    <div className="safe-row">
+                      <span className="text-muted">Safety buffer (10% of budget)</span>
+                      <span style={{ color: 'var(--warning-dark)', fontWeight: 600 }}>− {formatCurrency(buffer)}</span>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="safe-row">
                   <span className="text-muted">Safe amount for the rest of this month</span>
                   <span style={{ color: 'var(--success-dark)', fontWeight: 600 }}>
@@ -240,6 +251,10 @@ const RiskPage: React.FC = () => {
         </div>}
       </div>
 
+      {view === 'safe' && (
+        <AppreciationCard appreciation={safeToSpend?.appreciation ?? financialState?.appreciation} style={{ marginTop: '1.25rem' }} />
+      )}
+
       {view !== 'safe' && <div className={`risk-bottom-grid risk-bottom-grid-${view}`}>
 
         {/* Risk Alerts */}
@@ -279,7 +294,7 @@ const RiskPage: React.FC = () => {
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={breakdownData} layout="vertical" margin={{ left: 20, right: 20 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--bg-subtle)" />
-              <XAxis type="number" domain={[0, 30]} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
               <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} width={80} />
               <Tooltip formatter={(value) => [`${value ?? 0} pts`, 'Score']} />
               <Bar dataKey="value" radius={[0, 6, 6, 0]}>

@@ -111,6 +111,10 @@ export const runHealthScoreEngine = (
     0.10 * goalScore
   );
 
+  // Positive reinforcement for staying under safe-to-spend
+  const ap = state.appreciation;
+  if (ap?.eligible) insights.unshift(`🎉 You're ₹${ap.savedSoFar.toLocaleString("en-IN")} under your safe-to-spend allowance this month — keep it up!`);
+
   if (insights.length === 0) insights.push("✅ All financial health indicators look good");
 
   return {

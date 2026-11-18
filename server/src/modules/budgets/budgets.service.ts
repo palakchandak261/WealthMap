@@ -46,6 +46,20 @@ export const createBudgetService = async (
 };
 
 // ── Get the budget for the current calendar month ────────────────────────────
+// ── List all budgets (newest first) — used for full data export ──────────────
+export const listBudgetsService = async (userId: string) => {
+  const budgets = await prisma.budget.findMany({
+    where: { userId },
+    include: { categoryBudgets: true },
+    orderBy: [{ year: "desc" }, { month: "desc" }],
+  });
+  return budgets.map((b) => ({
+    ...b,
+    totalBudget: Number(b.totalBudget),
+    categoryBudgets: b.categoryBudgets.map((c) => ({ ...c, limit: Number(c.limit) })),
+  }));
+};
+
 export const getCurrentBudgetService = async (userId: string) => {
   const now = new Date();
   return getBudgetForMonthService(userId, now.getMonth() + 1, now.getFullYear());

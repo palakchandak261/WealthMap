@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { handleMockRequest } from './mockApiHandler';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1';
@@ -6,61 +6,61 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1';
 export const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 10000,
+  timeout: 15000,
 });
 
-// Helper to determine if demo mode is active
+/** Demo mode = everything runs in the browser against localStorage data. */
 export const isDemoMode = (): boolean => {
-  return localStorage.getItem('wm_demo_mode') === 'true';
+  try {
+    return localStorage.getItem('wm_demo_mode') === 'true';
+  } catch {
+    return false;
+  }
 };
 
-// ── Request interceptor: route to mock handler if demo mode is enabled ────────
-api.interceptors.request.use(async (config) => {
+/** Axios adapter that answers requests from the in-browser demo backend. */
+const demoAdapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => {
+  const res = await handleMockRequest({
+    method: config.method,
+    url: config.url,
+    data: config.data,
+    params: config.params,
+  });
+  const response: AxiosResponse = {
+    data: res.body,
+    status: res.status,
+    statusText: res.status < 400 ? 'OK' : 'Error',
+    headers: {},
+    config,
+    request: {},
+  };
+  if (res.status >= 400) {
+    const message = (res.body as { error?: { message?: string } })?.error?.message ?? `Request failed with status ${res.status}`;
+    throw new AxiosError(message, res.status >= 500 ? AxiosError.ERR_BAD_RESPONSE : AxiosError.ERR_BAD_REQUEST, config, response.request, response);
+  }
+  return response;
+};
+
+// ── Request interceptor: auth header + demo routing ──────────────────────────
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem('wm_token');
-  if (token) {
-    config.headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  // If in demo mode, handle client-side via mock handler
-  if (isDemoMode()) {
-    const mockRes = await handleMockRequest({
-      method: config.method,
-      url: config.url,
-      data: config.data,
-      params: config.params,
-    });
-    // Return custom adapter response to resolve axios promise immediately
-    config.adapter = () => Promise.resolve(mockRes);
-  }
-
+  if (token) config.headers['Authorization'] = `Bearer ${token}`;
+  if (isDemoMode()) config.adapter = demoAdapter;
   return config;
 });
 
-// ── Response interceptor: auto fallback to mock handler if backend is offline ─
+// ── Response interceptor: session expiry ──────────────────────────────────────
+// Normal mode never silently switches to fake data: if the server is down the
+// page shows a clear "cannot reach server" error (and Login offers demo mode).
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    // If backend is unreachable (network error / connection refused / 502/503/504)
-    const isNetworkError = !error.response || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED';
-    if (isNetworkError) {
-      console.warn('Backend server offline or unreachable. Serving response from local demo data store.');
-      try {
-        const mockRes = await handleMockRequest({
-          method: error.config?.method,
-          url: error.config?.url,
-          data: error.config?.data,
-          params: error.config?.params,
-        });
-        return mockRes;
-      } catch (mockErr) {
-        return Promise.reject(mockErr);
-      }
-    }
-
-    if (error.response?.status === 401 && !isDemoMode()) {
+  (error: AxiosError) => {
+    const url = error.config?.url ?? '';
+    const isAuthCall = /\/auth\/(login|register|send-otp|verify-otp|forgot-password|reset-password)/.test(url);
+    if (error.response?.status === 401 && !isDemoMode() && !isAuthCall) {
       localStorage.removeItem('wm_token');
       localStorage.removeItem('wm_user');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') window.location.href = '/login';
     }
     return Promise.reject(error);
   }

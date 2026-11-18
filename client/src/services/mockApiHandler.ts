@@ -1,323 +1,513 @@
 /**
- * Mock API Handler
- * Handles API calls locally using the mock store when demo mode is enabled
- * or when the backend service is offline.
+ * Demo-mode API (browser-only backend)
+ * ────────────────────────────────────
+ * Mirrors every REST route of the Express server against the localStorage demo
+ * store, with the same response shapes ({ success, data, message }) and the
+ * same error format, so every page behaves identically in demo and normal mode.
+ * Engine numbers come from demoEngine.ts (ports of the server engines).
  */
 
+import type { Budget, Expense, Goal, GoalContribution, Income, Obligation, ImportCounts } from '../types';
+import { loadMockStore, saveMockStore, newId, type MockStore } from './mockData';
 import {
-  loadMockStore, saveMockStore, computeMockFinancialState,
-  getMockRisk, getMockHealth, getMockForecast, getMockDependencyGraph
-} from './mockData';
-import type { Expense, Goal, Income, Obligation } from '../types';
+  buildDemoFinancialState, runDemoForecast, runDemoRisk, runDemoHealth, runDemoSimulation,
+  buildDemoGraph, buildDemoPlanning, buildDemoAdvice, enrichDemoBudget, findBudget,
+  getDemoAnomalies, listDemoGoals, serializeDemoGoal,
+} from './demoEngine';
 
-export const handleMockRequest = async (config: {
+export interface MockResponse {
+  status: number;
+  body: unknown;
+}
+
+export interface MockRequest {
   method?: string;
   url?: string;
-  data?: any;
-  params?: any;
-}): Promise<any> => {
-  const method = (config.method ?? 'get').toUpperCase();
-  const url = (config.url ?? '').replace(/^\/api\/v1/, '');
-  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {});
+  data?: unknown;
+  params?: Record<string, unknown>;
+}
+
+class HttpError extends Error {
+  status: number;
+  code: string;
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const ok = (data: unknown, message?: string, status = 200): MockResponse =>
+  ({ status, body: { success: true, data, ...(message && { message }) } });
+const fail = (status: number, code: string, message: string): MockResponse =>
+  ({ status, body: { success: false, error: { code, message } } });
+const notFound = (what: string) => new HttpError(404, 'NOT_FOUND', `${what} not found`);
+const badRequest = (message: string) => new HttpError(400, 'VALIDATION_ERROR', message);
+
+const now = () => new Date().toISOString();
+const t = (d: string) => new Date(d).getTime();
+const num = (v: unknown, field: string, { min = 0, allowZero = false } = {}) => {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < min || (!allowZero && n === 0)) throw badRequest(`${field} must be a ${allowZero ? 'non-negative' : 'positive'} number`);
+  return n;
+};
+const dateStr = (v: unknown, field: string) => {
+  const d = new Date(String(v ?? ''));
+  if (v === undefined || v === null || v === '' || Number.isNaN(d.getTime())) throw badRequest(`${field} must be a valid date`);
+  return d.toISOString();
+};
+const pick = <T extends object>(body: Record<string, unknown>, keys: (keyof T)[]) =>
+  Object.fromEntries(keys.filter((k) => body[k as string] !== undefined).map((k) => [k, body[k as string]])) as Partial<T>;
+
+const parseBody = (data: unknown): Record<string, unknown> => {
+  if (typeof data === 'string') {
+    try { return data ? JSON.parse(data) : {}; } catch { return {}; }
+  }
+  return (data as Record<string, unknown>) ?? {};
+};
+
+const dayKey = (d: string) => { const x = new Date(d); return `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`; };
+const money = (n: unknown) => Number(n).toFixed(2);
+const text = (s: unknown) => String(s ?? '').trim().toLowerCase();
+
+// ─────────────────────────────────────────────────────────────────────────────
+export const handleMockRequest = async (req: MockRequest): Promise<MockResponse> => {
+  try {
+    return route(req);
+  } catch (err) {
+    if (err instanceof HttpError) return fail(err.status, err.code, err.message);
+    console.error('[demo] unexpected error', err);
+    return fail(500, 'INTERNAL_ERROR', err instanceof Error ? err.message : 'Something went wrong in demo mode');
+  }
+};
+
+const route = (req: MockRequest): MockResponse => {
+  const method = (req.method ?? 'get').toUpperCase();
+  const [rawPath, rawQuery = ''] = (req.url ?? '').replace(/^https?:\/\/[^/]+/, '').replace(/^\/api\/v1/, '').split('?');
+  const path = rawPath.replace(/\/+$/, '') || '/';
+  const query: Record<string, string> = { ...Object.fromEntries(new URLSearchParams(rawQuery)) };
+  for (const [k, v] of Object.entries(req.params ?? {})) if (v !== undefined && v !== null) query[k] = String(v);
+  const body = parseBody(req.data);
+  const seg = path.split('/').filter(Boolean);       // e.g. ['goals', 'goal-1', 'contribute']
+  const is = (m: string, pattern: string) => {
+    if (m !== method) return false;
+    const p = pattern.split('/').filter(Boolean);
+    return p.length === seg.length && p.every((s, i) => s.startsWith(':') || s === seg[i]);
+  };
 
   const store = loadMockStore();
+  const commit = () => saveMockStore(store);
 
-  // Helper response wrapper
-  const ok = (data: any, message?: string) => ({
-    data: { success: true, data, message },
-    status: 200,
-    statusText: 'OK',
-    headers: {},
-    config,
+  // ── Auth / profile ──────────────────────────────────────────────────────────
+  if (is('GET', '/auth/me') || is('GET', '/users/profile')) return ok(store.user);
+  if (is('POST', '/auth/login')) return ok({ token: 'demo-token', user: store.user }, 'Logged in (demo)');
+  if (seg[0] === 'auth') return fail(400, 'DEMO_MODE', 'This action is not available in demo mode. Log out of the demo to use a real account.');
+  if (is('PATCH', '/users/profile')) {
+    const numeric = ['cashBalance', 'savingsBalance', 'emergencyFundBalance', 'declaredMonthlyIncome'] as const;
+    for (const k of numeric) if (body[k] !== undefined) num(body[k], k, { allowZero: true });
+    store.user = {
+      ...store.user,
+      ...pick(body, ['name', 'currency', 'onboardingComplete']),
+      ...Object.fromEntries(numeric.filter((k) => body[k] !== undefined).map((k) => [k, Number(body[k])])),
+      updatedAt: now(),
+    };
+    commit();
+    return ok(store.user, 'Profile updated');
+  }
+
+  // ── Income ──────────────────────────────────────────────────────────────────
+  if (is('GET', '/income')) return ok([...store.incomes].sort((a, b) => t(b.receivedAt) - t(a.receivedAt)));
+  if (is('POST', '/income')) {
+    if (!String(body.source ?? '').trim()) throw badRequest('Source is required');
+    const inc: Income = {
+      id: newId('inc'), userId: store.user.id, source: String(body.source).trim(), amount: num(body.amount, 'amount'),
+      frequency: (body.frequency as Income['frequency']) ?? 'MONTHLY', isRecurring: body.isRecurring !== undefined ? Boolean(body.isRecurring) : true,
+      receivedAt: body.receivedAt ? dateStr(body.receivedAt, 'receivedAt') : now(), createdAt: now(), updatedAt: now(),
+    };
+    store.incomes.unshift(inc);
+    commit();
+    return ok(inc, 'Income added', 201);
+  }
+  if (is('PATCH', '/income/:id')) {
+    const inc = store.incomes.find((i) => i.id === seg[1]);
+    if (!inc) throw notFound('Income');
+    Object.assign(inc, pick<Income>(body, ['source', 'frequency', 'isRecurring']),
+      body.amount !== undefined && { amount: num(body.amount, 'amount') },
+      body.receivedAt !== undefined && { receivedAt: dateStr(body.receivedAt, 'receivedAt') },
+      { updatedAt: now() });
+    commit();
+    return ok(inc, 'Income updated');
+  }
+  if (is('DELETE', '/income/:id')) {
+    if (!store.incomes.some((i) => i.id === seg[1])) throw notFound('Income');
+    store.incomes = store.incomes.filter((i) => i.id !== seg[1]);
+    commit();
+    return ok(null, 'Income deleted');
+  }
+
+  // ── Expenses ────────────────────────────────────────────────────────────────
+  if (is('GET', '/expenses')) {
+    let list = [...store.expenses];
+    if (query.month && query.year) {
+      const s = new Date(Number(query.year), Number(query.month) - 1, 1).getTime();
+      const e = new Date(Number(query.year), Number(query.month), 0, 23, 59, 59, 999).getTime();
+      list = list.filter((x) => t(x.spentAt) >= s && t(x.spentAt) <= e);
+    }
+    if (query.category) list = list.filter((x) => x.category === query.category);
+    return ok(list.sort((a, b) => t(b.spentAt) - t(a.spentAt)));
+  }
+  if (is('POST', '/expenses')) {
+    const exp = makeExpense(store, body);
+    store.expenses.unshift(exp);
+    commit();
+    return ok(exp, 'Expense added', 201);
+  }
+  if (is('POST', '/expenses/bulk')) {
+    const items = Array.isArray(req.data) ? req.data : Array.isArray(body.items) ? body.items : [];
+    if (items.length === 0) throw badRequest('No expenses to import');
+    const created = items.map((it: Record<string, unknown>, i: number) => {
+      try { return makeExpense(store, it); } catch (e) { throw badRequest(`Row ${i + 1}: ${(e as Error).message}`); }
+    });
+    store.expenses.unshift(...created);
+    commit();
+    return ok({ count: created.length }, `${created.length} expenses imported`, 201);
+  }
+  if (is('PATCH', '/expenses/:id')) {
+    const exp = store.expenses.find((e) => e.id === seg[1]);
+    if (!exp) throw notFound('Expense');
+    Object.assign(exp, pick<Expense>(body, ['category', 'description', 'paymentMethod', 'isRecurring']),
+      body.amount !== undefined && { amount: num(body.amount, 'amount') },
+      body.spentAt !== undefined && { spentAt: dateStr(body.spentAt, 'spentAt') },
+      { updatedAt: now() });
+    commit();
+    return ok(exp, 'Expense updated');
+  }
+  if (is('DELETE', '/expenses/:id')) {
+    if (!store.expenses.some((e) => e.id === seg[1])) throw notFound('Expense');
+    store.expenses = store.expenses.filter((e) => e.id !== seg[1]);
+    commit();
+    return ok(null, 'Expense deleted');
+  }
+
+  // ── Budgets ─────────────────────────────────────────────────────────────────
+  if (is('GET', '/budgets')) {
+    return ok([...store.budgets].sort((a, b) => b.year - a.year || b.month - a.month));
+  }
+  if (is('GET', '/budgets/current')) {
+    const d = new Date();
+    const b = findBudget(store, d.getMonth() + 1, d.getFullYear());
+    return ok(b ? enrichDemoBudget(store, b) : null);
+  }
+  if (is('GET', '/budgets/:id')) {
+    const b = store.budgets.find((x) => x.id === seg[1]);
+    if (!b) throw notFound('Budget');
+    return ok(b);
+  }
+  if (is('POST', '/budgets')) {
+    const month = Number(body.month), year = Number(body.year);
+    if (!(month >= 1 && month <= 12) || !(year >= 2000 && year <= 2100)) throw badRequest('A valid month and year are required');
+    const total = num(body.totalBudget, 'totalBudget');
+    let b = findBudget(store, month, year);
+    if (!b) {
+      b = { id: `budget-${year}-${month}-${Date.now().toString(36)}`, userId: store.user.id, month, year, totalBudget: total, categoryBudgets: [], createdAt: now(), updatedAt: now() };
+      store.budgets.push(b);
+    }
+    b.totalBudget = total;
+    b.categoryBudgets = toCategoryBudgets(b.id, body.categoryBudgets);
+    b.updatedAt = now();
+    commit();
+    return ok(b, 'Budget saved', 201);
+  }
+  if (is('PATCH', '/budgets/:id')) {
+    const b = store.budgets.find((x) => x.id === seg[1]);
+    if (!b) throw notFound('Budget');
+    if (body.totalBudget !== undefined) b.totalBudget = num(body.totalBudget, 'totalBudget');
+    if (body.categoryBudgets !== undefined) b.categoryBudgets = toCategoryBudgets(b.id, body.categoryBudgets);
+    b.updatedAt = now();
+    commit();
+    return ok(b, 'Budget updated');
+  }
+  if (is('DELETE', '/budgets/:id')) {
+    if (!store.budgets.some((x) => x.id === seg[1])) throw notFound('Budget');
+    store.budgets = store.budgets.filter((x) => x.id !== seg[1]);
+    commit();
+    return ok(null, 'Budget deleted');
+  }
+
+  // ── Obligations ─────────────────────────────────────────────────────────────
+  if (is('GET', '/obligations')) {
+    let list = [...store.obligations];
+    if (query.isPaid === 'true' || query.isPaid === 'false') list = list.filter((o) => o.isPaid === (query.isPaid === 'true'));
+    return ok(list.sort((a, b) => t(a.dueDate) - t(b.dueDate)));
+  }
+  if (is('GET', '/obligations/upcoming')) {
+    const days = Number(query.days) || 30;
+    const from = Date.now(), to = from + days * 86_400_000;
+    return ok(store.obligations.filter((o) => !o.isPaid && t(o.dueDate) >= from && t(o.dueDate) <= to).sort((a, b) => t(a.dueDate) - t(b.dueDate)));
+  }
+  if (is('POST', '/obligations')) {
+    if (!String(body.name ?? '').trim()) throw badRequest('Name is required');
+    const o: Obligation = {
+      id: newId('obl'), userId: store.user.id, name: String(body.name).trim(), type: (body.type as Obligation['type']) ?? 'OTHER',
+      amount: num(body.amount, 'amount'), dueDate: dateStr(body.dueDate, 'dueDate'),
+      frequency: (body.frequency as Obligation['frequency']) ?? 'MONTHLY',
+      isRecurring: body.isRecurring !== undefined ? Boolean(body.isRecurring) : true,
+      isPaid: Boolean(body.isPaid), createdAt: now(), updatedAt: now(),
+    };
+    store.obligations.push(o);
+    commit();
+    return ok(o, 'Obligation created', 201);
+  }
+  if (is('PATCH', '/obligations/:id/pay') || is('PATCH', '/obligations/:id')) {
+    const o = store.obligations.find((x) => x.id === seg[1]);
+    if (!o) throw notFound('Obligation');
+    if (seg[2] === 'pay') o.isPaid = true;
+    else Object.assign(o, pick<Obligation>(body, ['name', 'type', 'frequency', 'isRecurring', 'isPaid']),
+      body.amount !== undefined && { amount: num(body.amount, 'amount') },
+      body.dueDate !== undefined && { dueDate: dateStr(body.dueDate, 'dueDate') });
+    o.updatedAt = now();
+    commit();
+    return ok(o, seg[2] === 'pay' ? 'Marked as paid' : 'Obligation updated');
+  }
+  if (is('DELETE', '/obligations/:id')) {
+    if (!store.obligations.some((x) => x.id === seg[1])) throw notFound('Obligation');
+    store.obligations = store.obligations.filter((x) => x.id !== seg[1]);
+    commit();
+    return ok(null, 'Obligation deleted');
+  }
+
+  // ── Goals ───────────────────────────────────────────────────────────────────
+  if (is('GET', '/goals')) {
+    const rate = query.inflationRate !== undefined && query.inflationRate !== '' && Number.isFinite(Number(query.inflationRate)) ? Number(query.inflationRate) : null;
+    return ok(listDemoGoals(store, rate));
+  }
+  if (is('POST', '/goals')) {
+    if (!String(body.name ?? '').trim()) throw badRequest('Goal name is required');
+    const target = num(body.targetAmount, 'targetAmount');
+    const current = body.currentAmount !== undefined ? num(body.currentAmount, 'currentAmount', { allowZero: true }) : 0;
+    const g: Goal = {
+      id: newId('goal'), userId: store.user.id, name: String(body.name).trim(), targetAmount: target, currentAmount: current,
+      deadline: body.deadline ? dateStr(body.deadline, 'deadline') : null,
+      status: (body.status as Goal['status']) ?? (current >= target ? 'COMPLETED' : 'ACTIVE'),
+      category: (body.category as string) ?? 'OTHER', priority: (body.priority as Goal['priority']) ?? 'MEDIUM',
+      inflationRate: inflationOrNull(body.inflationRate), createdAt: now(), updatedAt: now(),
+    };
+    store.goals.push(g);
+    commit();
+    return ok(serializeDemoGoal(store, g), 'Goal created', 201);
+  }
+  if (is('PATCH', '/goals/:id/contribute')) {
+    const g = store.goals.find((x) => x.id === seg[1]);
+    if (!g) throw notFound('Goal');
+    const amount = num(body.amount, 'amount');
+    const c: GoalContribution = {
+      id: newId('gc'), goalId: g.id, userId: store.user.id, amount,
+      note: body.note ? String(body.note).slice(0, 120) : null,
+      contributedAt: body.contributedAt ? dateStr(body.contributedAt, 'contributedAt') : now(),
+    };
+    store.goalContributions.push(c);
+    g.currentAmount = Number(g.currentAmount) + amount;
+    if (g.currentAmount >= Number(g.targetAmount)) g.status = 'COMPLETED';
+    g.updatedAt = now();
+    commit();
+    return ok(serializeDemoGoal(store, g), 'Contribution added');
+  }
+  if (is('PATCH', '/goals/:id')) {
+    const g = store.goals.find((x) => x.id === seg[1]);
+    if (!g) throw notFound('Goal');
+    if (body.name !== undefined && !String(body.name).trim()) throw badRequest('Goal name is required');
+    Object.assign(g, pick<Goal>(body, ['name', 'category', 'priority']),
+      body.targetAmount !== undefined && { targetAmount: num(body.targetAmount, 'targetAmount') },
+      body.currentAmount !== undefined && { currentAmount: num(body.currentAmount, 'currentAmount', { allowZero: true }) },
+      body.deadline !== undefined && { deadline: body.deadline ? dateStr(body.deadline, 'deadline') : null },
+      body.inflationRate !== undefined && { inflationRate: inflationOrNull(body.inflationRate) });
+    if (body.status) g.status = body.status as Goal['status'];
+    else if (g.status === 'COMPLETED' && g.currentAmount < g.targetAmount) g.status = 'ACTIVE';
+    else if (g.status === 'ACTIVE' && g.currentAmount >= g.targetAmount) g.status = 'COMPLETED';
+    g.updatedAt = now();
+    commit();
+    return ok(serializeDemoGoal(store, g), 'Goal updated');
+  }
+  if (is('DELETE', '/goals/:id')) {
+    if (!store.goals.some((x) => x.id === seg[1])) throw notFound('Goal');
+    store.goals = store.goals.filter((x) => x.id !== seg[1]);
+    store.goalContributions = store.goalContributions.filter((c) => c.goalId !== seg[1]);
+    commit();
+    return ok(null, 'Goal deleted');
+  }
+
+  // ── Import (CSV / Excel / JSON) ─────────────────────────────────────────────
+  if (is('POST', '/import')) {
+    const result = importIntoStore(store, body);
+    commit();
+    return ok(result, `Imported ${result.total} record${result.total === 1 ? '' : 's'}`, 201);
+  }
+
+  // ── Engines ─────────────────────────────────────────────────────────────────
+  if (seg[0] === 'engine' || seg[0] === 'ai') {
+    const state = buildDemoFinancialState(store);
+    const forecast = runDemoForecast(store, state);
+    const risk = runDemoRisk(state, forecast);
+    const health = runDemoHealth(state, forecast);
+
+    if (is('GET', '/engine/financial-state')) return ok(state);
+    if (is('GET', '/engine/forecast')) return ok(forecast);
+    if (is('GET', '/engine/risk')) return ok(risk);
+    if (is('GET', '/engine/health-score')) return ok(health);
+    if (is('GET', '/engine/risk-history')) return ok([]);
+    if (is('GET', '/engine/anomalies')) return ok(getDemoAnomalies(store));
+    if (is('GET', '/engine/dependency-graph')) return ok(buildDemoGraph(state, risk.riskScore));
+    if (is('GET', '/engine/safe-to-spend')) {
+      return ok({
+        safeSpendableAmount: state.safeSpendableAmount, safeDailySpending: state.safeDailySpending,
+        daysRemaining: state.daysRemainingInMonth, budgetRemaining: state.totalRemaining,
+        upcomingObligations: state.totalUpcomingAmount, dueThisMonth: state.dueThisMonthAmount ?? 0,
+        appreciation: state.appreciation ?? null,
+      });
+    }
+    if (is('GET', '/engine/planning')) {
+      const rate = query.inflationRate !== undefined && query.inflationRate !== '' ? Number(query.inflationRate) : null;
+      if (rate !== null && (!Number.isFinite(rate) || rate < 0 || rate > 50)) throw badRequest('inflationRate must be between 0 and 50');
+      return ok(buildDemoPlanning(store, state, forecast, { inflationRate: rate, inflationEnabled: query.inflation !== 'off' }));
+    }
+    if (is('POST', '/engine/simulate')) {
+      const amount = Number(body.amount);
+      if (!amount || Number.isNaN(amount)) throw badRequest('amount is required and must be a number');
+      return ok(runDemoSimulation(state, forecast, risk, health, {
+        amount, category: body.category as string | undefined, description: body.description as string | undefined,
+      }));
+    }
+    if (is('POST', '/ai/recommendations')) {
+      const rate = Number(body.inflationRate);
+      const planning = buildDemoPlanning(store, state, forecast, { inflationRate: Number.isFinite(rate) && rate >= 0 && rate <= 50 ? rate : null });
+      const prompt = typeof body.context === 'string' ? body.context.slice(0, 500) : undefined;
+      return ok(buildDemoAdvice(state, forecast, risk, health, planning, prompt));
+    }
+  }
+
+  return fail(404, 'NOT_FOUND', `Route ${method} ${path} is not available in demo mode`);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const PAYMENT_METHODS = ['CASH', 'UPI', 'CARD', 'NET_BANKING', 'OTHER'];
+
+const makeExpense = (store: MockStore, b: Record<string, unknown>): Expense => {
+  const category = String(b.category ?? '').trim().toUpperCase();
+  if (!category) throw badRequest('Category is required');
+  return {
+    id: newId('exp'), userId: store.user.id, category, amount: num(b.amount, 'amount'),
+    description: b.description ? String(b.description) : undefined,
+    paymentMethod: (PAYMENT_METHODS.includes(String(b.paymentMethod)) ? b.paymentMethod : 'OTHER') as Expense['paymentMethod'],
+    isRecurring: Boolean(b.isRecurring), spentAt: dateStr(b.spentAt ?? now(), 'spentAt'), createdAt: now(), updatedAt: now(),
+  };
+};
+
+const toCategoryBudgets = (budgetId: string, raw: unknown): Budget['categoryBudgets'] =>
+  (Array.isArray(raw) ? raw : []).map((cb: Record<string, unknown>, i) => ({
+    id: `${budgetId}-cb-${i}-${Date.now().toString(36)}`, budgetId,
+    category: String(cb.category ?? 'OTHER').toUpperCase(), limit: num(cb.limit, `${cb.category ?? 'category'} limit`),
+    createdAt: now(), updatedAt: now(),
+  }));
+
+const inflationOrNull = (v: unknown) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0 || n > 50) throw badRequest('inflationRate must be between 0 and 50');
+  return n;
+};
+
+/** Multiset counter so each existing record absorbs at most one duplicate (same as server). */
+const counter = (keys: string[]) => {
+  const map = new Map<string, number>();
+  for (const k of keys) map.set(k, (map.get(k) ?? 0) + 1);
+  return (k: string) => { const n = map.get(k) ?? 0; if (n > 0) { map.set(k, n - 1); return true; } return false; };
+};
+
+/** Same semantics as server/src/modules/import/import.service.ts */
+const importIntoStore = (store: MockStore, body: Record<string, unknown>) => {
+  const arr = (k: string) => (Array.isArray(body[k]) ? body[k] as Record<string, unknown>[] : []);
+  const skipDup = (body.options as { skipDuplicates?: boolean } | undefined)?.skipDuplicates !== false;
+  const created: ImportCounts = { expenses: 0, incomes: 0, obligations: 0, goals: 0, budgets: 0 };
+  const skipped: ImportCounts = { expenses: 0, incomes: 0, obligations: 0, goals: 0, budgets: 0 };
+  const sections = ['expenses', 'incomes', 'obligations', 'goals', 'budgets'];
+  if (sections.every((s) => arr(s).length === 0)) throw badRequest('Nothing to import — the file has no valid rows');
+
+  // Validate everything first so a bad row aborts the whole import (like the DB transaction)
+  const rowError = (section: string, i: number, e: unknown) => badRequest(`${section} row ${i + 1}: ${(e as Error).message}`);
+  const expenses = arr('expenses').map((r, i) => { try { return makeExpense(store, r); } catch (e) { throw rowError('expenses', i, e); } });
+  const incomes = arr('incomes').map((r, i): Income => {
+    try {
+      if (!String(r.source ?? '').trim()) throw badRequest('source is required');
+      return { id: newId('inc'), userId: store.user.id, source: String(r.source).trim(), amount: num(r.amount, 'amount'), frequency: (r.frequency as Income['frequency']) ?? 'MONTHLY', isRecurring: r.isRecurring !== undefined ? Boolean(r.isRecurring) : true, receivedAt: dateStr(r.receivedAt, 'receivedAt'), createdAt: now(), updatedAt: now() };
+    } catch (e) { throw rowError('incomes', i, e); }
+  });
+  const obligations = arr('obligations').map((r, i): Obligation => {
+    try {
+      if (!String(r.name ?? '').trim()) throw badRequest('name is required');
+      return { id: newId('obl'), userId: store.user.id, name: String(r.name).trim(), type: (r.type as Obligation['type']) ?? 'OTHER', amount: num(r.amount, 'amount'), dueDate: dateStr(r.dueDate, 'dueDate'), frequency: (r.frequency as Obligation['frequency']) ?? 'MONTHLY', isRecurring: r.isRecurring !== undefined ? Boolean(r.isRecurring) : true, isPaid: Boolean(r.isPaid), createdAt: now(), updatedAt: now() };
+    } catch (e) { throw rowError('obligations', i, e); }
+  });
+  const goals = arr('goals').map((r, i): Goal => {
+    try {
+      if (!String(r.name ?? '').trim()) throw badRequest('name is required');
+      const target = num(r.targetAmount, 'targetAmount');
+      const current = r.currentAmount !== undefined ? num(r.currentAmount, 'currentAmount', { allowZero: true }) : 0;
+      return { id: newId('goal'), userId: store.user.id, name: String(r.name).trim(), targetAmount: target, currentAmount: current, deadline: r.deadline ? dateStr(r.deadline, 'deadline') : null, status: (r.status as Goal['status']) ?? (current >= target ? 'COMPLETED' : 'ACTIVE'), category: (r.category as string) ?? 'OTHER', priority: (r.priority as Goal['priority']) ?? 'MEDIUM', inflationRate: inflationOrNull(r.inflationRate), createdAt: now(), updatedAt: now() };
+    } catch (e) { throw rowError('goals', i, e); }
   });
 
-  // 1. Auth routes
-  if (url === '/auth/me') {
-    return ok(store.user);
+  // Expenses
+  const expTake = counter(store.expenses.map((e) => `${dayKey(e.spentAt)}|${money(e.amount)}|${e.category}|${text(e.description)}`));
+  for (const e of expenses) {
+    if (skipDup && expTake(`${dayKey(e.spentAt)}|${money(e.amount)}|${e.category}|${text(e.description)}`)) { skipped.expenses++; continue; }
+    store.expenses.push(e); created.expenses++;
   }
-  if (url === '/auth/login') {
-    return ok({ token: 'mock-demo-jwt-token-wealthmap', user: store.user });
+  // Incomes
+  const incTake = counter(store.incomes.map((x) => `${dayKey(x.receivedAt)}|${money(x.amount)}|${text(x.source)}`));
+  for (const x of incomes) {
+    if (skipDup && incTake(`${dayKey(x.receivedAt)}|${money(x.amount)}|${text(x.source)}`)) { skipped.incomes++; continue; }
+    store.incomes.push(x); created.incomes++;
   }
-
-  // 2. Goals routes
-  if (url === '/goals' && method === 'GET') {
-    return ok({ items: store.goals });
+  // Obligations
+  const oblTake = counter(store.obligations.map((o) => `${text(o.name)}|${money(o.amount)}|${dayKey(o.dueDate)}`));
+  for (const o of obligations) {
+    if (skipDup && oblTake(`${text(o.name)}|${money(o.amount)}|${dayKey(o.dueDate)}`)) { skipped.obligations++; continue; }
+    store.obligations.push(o); created.obligations++;
   }
-  if (url === '/goals' && method === 'POST') {
-    const newGoal: Goal = {
-      id: `goal-${Date.now()}`,
-      userId: store.user.id,
-      name: body.name,
-      targetAmount: Number(body.targetAmount),
-      currentAmount: Number(body.currentAmount || 0),
-      deadline: body.deadline,
-      status: body.status || 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    store.goals.push(newGoal);
-    saveMockStore(store);
-    return ok(newGoal, 'Goal added successfully');
+  // Goals (duplicate = same name)
+  const names = new Set(store.goals.map((g) => text(g.name)));
+  for (const g of goals) {
+    if (skipDup && names.has(text(g.name))) { skipped.goals++; continue; }
+    names.add(text(g.name));
+    store.goals.push(g); created.goals++;
   }
-  if (url.startsWith('/goals/') && url.endsWith('/contribute') && method === 'PATCH') {
-    const parts = url.split('/');
-    const goalId = parts[2];
-    const goal = store.goals.find(g => g.id === goalId);
-    if (goal) {
-      goal.currentAmount = Math.min(Number(goal.targetAmount), Number(goal.currentAmount) + Number(body.amount));
-      if (goal.currentAmount >= Number(goal.targetAmount)) {
-        goal.status = 'COMPLETED';
-      }
-      goal.updatedAt = new Date().toISOString();
-      saveMockStore(store);
-      return ok(goal, 'Contribution added');
+  // Budgets: upsert month, merge category limits
+  for (const [i, b] of arr('budgets').entries()) {
+    const month = Number(b.month), year = Number(b.year);
+    if (!(month >= 1 && month <= 12) || !(year >= 2000 && year <= 2100)) throw badRequest(`budgets row ${i + 1}: invalid month/year`);
+    const cats = (Array.isArray(b.categories) ? b.categories : []) as { category: string; limit: number }[];
+    const sumLimits = cats.reduce((s, c) => s + Number(c.limit || 0), 0);
+    let budget = findBudget(store, month, year);
+    const total = b.totalBudget != null ? Number(b.totalBudget) : budget ? budget.totalBudget : sumLimits;
+    if (!total || total <= 0) { skipped.budgets++; continue; }
+    if (!budget) {
+      budget = { id: `budget-${year}-${month}-${Date.now().toString(36)}`, userId: store.user.id, month, year, totalBudget: total, categoryBudgets: [], createdAt: now(), updatedAt: now() };
+      store.budgets.push(budget);
     }
-  }
-  if (url.startsWith('/goals/') && method === 'PATCH') {
-    const goalId = url.split('/')[2];
-    const goalIndex = store.goals.findIndex(g => g.id === goalId);
-    if (goalIndex >= 0) {
-      store.goals[goalIndex] = {
-        ...store.goals[goalIndex],
-        ...body,
-        targetAmount: body.targetAmount !== undefined ? Number(body.targetAmount) : store.goals[goalIndex].targetAmount,
-        currentAmount: body.currentAmount !== undefined ? Number(body.currentAmount) : store.goals[goalIndex].currentAmount,
-        updatedAt: new Date().toISOString(),
-      };
-      saveMockStore(store);
-      return ok(store.goals[goalIndex], 'Goal updated');
+    budget.totalBudget = total;
+    for (const c of cats) {
+      const category = String(c.category).toUpperCase();
+      const limit = num(c.limit, `${category} limit`);
+      const existing = budget.categoryBudgets.find((x) => x.category === category);
+      if (existing) { existing.limit = limit; existing.updatedAt = now(); }
+      else budget.categoryBudgets.push({ id: `${budget.id}-${category}`, budgetId: budget.id, category, limit, createdAt: now(), updatedAt: now() });
     }
-  }
-  if (url.startsWith('/goals/') && method === 'DELETE') {
-    const goalId = url.split('/')[2];
-    store.goals = store.goals.filter(g => g.id !== goalId);
-    saveMockStore(store);
-    return ok({ id: goalId }, 'Goal deleted');
+    budget.updatedAt = now();
+    created.budgets++;
   }
 
-  // 3. Expenses routes
-  if (url === '/expenses' && method === 'GET') {
-    return ok({ items: store.expenses });
-  }
-  if (url === '/expenses' && method === 'POST') {
-    const newExp: Expense = {
-      id: `exp-${Date.now()}`,
-      userId: store.user.id,
-      category: body.category || 'OTHER',
-      amount: Number(body.amount),
-      description: body.description || '',
-      paymentMethod: body.paymentMethod || 'OTHER',
-      isRecurring: Boolean(body.isRecurring),
-      spentAt: body.spentAt || new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    store.expenses.unshift(newExp);
-    saveMockStore(store);
-    return ok(newExp, 'Expense added');
-  }
-  if ((url === '/expenses/bulk' || url === '/expenses/import') && method === 'POST') {
-    const items = Array.isArray(body.items) ? body.items : Array.isArray(body) ? body : [];
-    const created: Expense[] = items.map((item: any, idx: number) => ({
-      id: `exp-import-${Date.now()}-${idx}`,
-      userId: store.user.id,
-      category: item.category || 'OTHER',
-      amount: Number(item.amount),
-      description: item.description || '',
-      paymentMethod: item.paymentMethod || 'OTHER',
-      isRecurring: Boolean(item.isRecurring),
-      spentAt: item.spentAt ? new Date(item.spentAt).toISOString() : new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
-    store.expenses.unshift(...created);
-    saveMockStore(store);
-    return ok({ count: created.length, items: created }, `${created.length} expenses imported successfully`);
-  }
-  if (url.startsWith('/expenses/') && method === 'PATCH') {
-    const expId = url.split('/')[2];
-    const idx = store.expenses.findIndex(e => e.id === expId);
-    if (idx >= 0) {
-      store.expenses[idx] = { ...store.expenses[idx], ...body, updatedAt: new Date().toISOString() };
-      saveMockStore(store);
-      return ok(store.expenses[idx], 'Expense updated');
-    }
-  }
-  if (url.startsWith('/expenses/') && method === 'DELETE') {
-    const expId = url.split('/')[2];
-    store.expenses = store.expenses.filter(e => e.id !== expId);
-    saveMockStore(store);
-    return ok({ id: expId }, 'Expense deleted');
-  }
-
-  // 4. Incomes routes
-  if (url === '/income' && method === 'GET') {
-    return ok({ items: store.incomes });
-  }
-  if (url === '/income' && method === 'POST') {
-    const newInc: Income = {
-      id: `inc-${Date.now()}`,
-      userId: store.user.id,
-      source: body.source,
-      amount: Number(body.amount),
-      frequency: body.frequency || 'MONTHLY',
-      isRecurring: Boolean(body.isRecurring),
-      receivedAt: body.receivedAt || new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    store.incomes.unshift(newInc);
-    saveMockStore(store);
-    return ok(newInc, 'Income added');
-  }
-  if (url.startsWith('/income/') && method === 'DELETE') {
-    const incId = url.split('/')[2];
-    store.incomes = store.incomes.filter(i => i.id !== incId);
-    saveMockStore(store);
-    return ok({ id: incId }, 'Income deleted');
-  }
-
-  // 5. Budgets routes
-  if (url.startsWith('/budgets') && method === 'GET') {
-    return ok(store.budget);
-  }
-  if (url === '/budgets' && (method === 'POST' || method === 'PUT')) {
-    store.budget = {
-      ...store.budget,
-      ...body,
-      totalBudget: Number(body.totalBudget || store.budget.totalBudget),
-      updatedAt: new Date().toISOString(),
-    };
-    saveMockStore(store);
-    return ok(store.budget, 'Budget updated');
-  }
-
-  // 6. Obligations routes
-  if (url === '/obligations' && method === 'GET') {
-    return ok({ items: store.obligations });
-  }
-  if (url === '/obligations' && method === 'POST') {
-    const newObl: Obligation = {
-      id: `obl-${Date.now()}`,
-      userId: store.user.id,
-      name: body.name,
-      type: body.type,
-      amount: Number(body.amount),
-      dueDate: body.dueDate,
-      frequency: body.frequency || 'MONTHLY',
-      isRecurring: Boolean(body.isRecurring),
-      isPaid: Boolean(body.isPaid),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    store.obligations.push(newObl);
-    saveMockStore(store);
-    return ok(newObl, 'Obligation created');
-  }
-  if (url.startsWith('/obligations/') && method === 'PATCH') {
-    const oblId = url.split('/')[2];
-    const idx = store.obligations.findIndex(o => o.id === oblId);
-    if (idx >= 0) {
-      store.obligations[idx] = { ...store.obligations[idx], ...body, updatedAt: new Date().toISOString() };
-      saveMockStore(store);
-      return ok(store.obligations[idx], 'Obligation updated');
-    }
-  }
-  if (url.startsWith('/obligations/') && method === 'DELETE') {
-    const oblId = url.split('/')[2];
-    store.obligations = store.obligations.filter(o => o.id !== oblId);
-    saveMockStore(store);
-    return ok({ id: oblId }, 'Obligation deleted');
-  }
-
-  // 7. Intelligence & Calculation Engines
-  const state = computeMockFinancialState(store.expenses, store.budget, store.obligations, store.goals);
-
-  if (url === '/engine/financial-state') {
-    return ok(state);
-  }
-  if (url === '/engine/forecast') {
-    return ok(getMockForecast(state));
-  }
-  if (url === '/engine/risk') {
-    return ok(getMockRisk(state));
-  }
-  if (url === '/engine/health-score') {
-    return ok(getMockHealth());
-  }
-  if (url === '/engine/dependency-graph') {
-    return ok(getMockDependencyGraph());
-  }
-  if (url === '/engine/simulate') {
-    const simAmount = Number(body.amount || 0);
-    const newSpent = state.totalSpent + simAmount;
-    const newRemaining = Math.max(state.totalBudget - newSpent, 0);
-    const safeDaily = Math.max(Math.round(newRemaining / state.daysRemainingInMonth), 0);
-    return ok({
-      input: { amount: simAmount, category: body.category, description: body.description },
-      before: {
-        riskScore: 24, riskLevel: 'LOW', healthScore: 88, healthGrade: 'EXCELLENT',
-        projectedExpense: state.totalSpent + 12000, cashBalance: state.cashBalance,
-        safeDaily: state.safeDailySpending, budgetRemaining: state.totalRemaining,
-      },
-      after: {
-        riskScore: simAmount > state.safeDailySpending * 3 ? 42 : 26,
-        riskLevel: simAmount > state.safeDailySpending * 3 ? 'MODERATE' : 'LOW',
-        healthScore: simAmount > state.safeDailySpending * 3 ? 79 : 86,
-        healthGrade: simAmount > state.safeDailySpending * 3 ? 'GOOD' : 'EXCELLENT',
-        projectedExpense: state.totalSpent + simAmount + 12000,
-        cashBalance: Math.max(state.cashBalance - simAmount, 0),
-        safeDaily: safeDaily, budgetRemaining: newRemaining,
-      },
-      diff: {
-        riskDelta: simAmount > state.safeDailySpending * 3 ? 18 : 2,
-        healthDelta: simAmount > state.safeDailySpending * 3 ? -9 : -2,
-        cashImpact: -simAmount,
-        budgetImpact: -simAmount,
-        projectedImpact: simAmount,
-      },
-      verdict: simAmount <= state.safeSpendableAmount
-        ? 'Safe purchase! You have ample buffer in your safe-to-spend allowance.'
-        : 'Caution: This purchase exceeds your safe discretionary buffer this month.',
-      safe: simAmount <= state.safeSpendableAmount,
-    });
-  }
-
-  // 8. AI Recommendations & Goal Advisory
-  if (url === '/ai/recommendations') {
-    const userPrompt = String(body.context || '').toLowerCase();
-    const isSafe = state.avgDailySpending <= state.safeDailySpending;
-
-    let recs: string[] = [];
-
-    if (userPrompt.includes('goal') || userPrompt.includes('save') || userPrompt.includes('vacation') || userPrompt.includes('emergency')) {
-      recs = [
-        `Target Savings Plan: Based on your current safe monthly surplus of ₹${state.safeSpendableAmount.toLocaleString('en-IN')}, we recommend saving ₹8,500/month for your Emergency Fund and ₹5,000/month for your Tech Upgrade.`,
-        `Inflation Protection: At a projected 6% annual inflation rate, your long-term goals will need an extra 12-18% capital buffer. Consider parking goals > 2 years into diversified index funds.`,
-        `Safe Spending Surplus: You are spending ₹${state.avgDailySpending}/day vs your safe limit of ₹${state.safeDailySpending}/day. This ₹${state.safeDailySpending - state.avgDailySpending}/day savings margin frees up ₹${Math.round((state.safeDailySpending - state.avgDailySpending) * state.daysRemainingInMonth)} extra this month directly for goal funding!`,
-      ];
-    } else {
-      recs = [
-        isSafe
-          ? `🎉 Outstanding spending discipline! Your daily spend is ₹${state.avgDailySpending}/day, keeping you well under your safe limit of ₹${state.safeDailySpending}/day. Maintain this to save ₹${Math.round((state.safeDailySpending - state.avgDailySpending) * state.daysRemainingInMonth)} extra this month!`
-          : `Keep an eye on dining and shopping: Try capping daily spending at ₹${state.safeDailySpending} for the remaining ${state.daysRemainingInMonth} days.`,
-        `Upcoming Obligation: Your laptop EMI of ₹4,500 is due soon. Funds are fully protected and safe in your balance.`,
-        `Long-Term Wealth: Allocate 35% of your remaining monthly surplus into your Emergency Fund goal to reach completion 2 months ahead of schedule.`,
-      ];
-    }
-
-    return ok({
-      recommendations: recs,
-      context: {
-        riskScore: isSafe ? 24 : 45,
-        riskLevel: isSafe ? 'LOW' : 'MODERATE',
-        healthScore: 88,
-        healthGrade: 'EXCELLENT',
-        willExceedBudget: false,
-      },
-    });
-  }
-
-  // Fallback for unknown routes
-  return ok({}, 'Demo response');
+  const total = Object.values(created).reduce((s, n) => s + n, 0);
+  return { created, skipped, total };
 };

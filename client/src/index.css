@@ -543,3 +543,212 @@ input:focus, select:focus, textarea:focus {
     align-self: flex-start;
   }
 }
+
+/* ============================================================
+   Shared components — planning, appreciation, import
+   ============================================================ */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--bg-subtle);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+.btn-ghost:hover { background: var(--bg-base); color: var(--text-secondary); }
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary-600);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.demo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: var(--radius-full);
+  background: var(--warning-light);
+  color: var(--warning-dark);
+  border: 1px solid #F3D9A6;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Segmented control (e.g. inflation mode) */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.segmented button {
+  border: none;
+  background: transparent;
+  padding: 0.38rem 0.75rem;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.segmented button.active {
+  background: var(--bg-surface);
+  color: var(--primary-700);
+  box-shadow: var(--neu-raised-sm);
+}
+
+/* Appreciation (spent less than safe-to-spend) */
+.appreciation-card {
+  position: relative;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--primary-200);
+  background: linear-gradient(135deg, #EAF7F0, #F7FCF9 60%);
+  overflow: hidden;
+}
+.appreciation-card.level-CHAMPION { border-color: #E8C76A; background: linear-gradient(135deg, #FFF6DB, #FFFDF5 60%); }
+.appreciation-card.level-OVER     { border-color: #F3D9A6; background: linear-gradient(135deg, var(--warning-light), #FFFDF8 60%); }
+.appreciation-card.level-NO_BUDGET { border-color: var(--border); background: var(--bg-surface); }
+.appreciation-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  font-size: 1.4rem;
+  box-shadow: var(--neu-raised-sm);
+}
+.appreciation-body { flex: 1; min-width: 0; }
+.appreciation-body h3 { font-size: 1rem; margin-bottom: 0.25rem; color: var(--text-primary); }
+.appreciation-body p { font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5; }
+.appreciation-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.7rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+.appreciation-stats strong { display: block; font-size: 0.95rem; color: var(--text-primary); }
+.appreciation-suggestion {
+  margin-top: 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary-700);
+}
+
+/* AI / rule insight cards */
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+.insight-card {
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--primary-500);
+  box-shadow: var(--neu-raised-sm);
+}
+.insight-card.cat-GOAL         { border-top-color: var(--primary-500); }
+.insight-card.cat-SAVING       { border-top-color: #3E7BD6; }
+.insight-card.cat-SPENDING     { border-top-color: var(--warning); }
+.insight-card.cat-INFLATION    { border-top-color: #8B5CF6; }
+.insight-card.cat-RISK         { border-top-color: var(--danger); }
+.insight-card.cat-APPRECIATION { border-top-color: #E0B23F; }
+.insight-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.insight-card h4 { font-size: 0.92rem; margin-bottom: 0.35rem; color: var(--text-primary); }
+.insight-card p { font-size: 0.82rem; line-height: 1.55; color: var(--text-secondary); }
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--primary-100);
+  color: var(--primary-700);
+}
+.source-badge.rules { background: var(--bg-subtle); color: var(--text-secondary); }
+
+/* Compact progress bar */
+.mini-progress {
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+.mini-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary-500), var(--success));
+  transition: width var(--transition-slow);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.status-ON_TRACK, .status-COMPLETED, .status-NO_DEADLINE { background: var(--success-light); color: var(--success-dark); }
+.status-BEHIND      { background: var(--warning-light); color: var(--warning-dark); }
+.status-NOT_STARTED { background: var(--bg-subtle); color: var(--text-secondary); }
+.status-OVERDUE     { background: var(--danger-light); color: var(--danger-dark); }
+
+.table-scroll { width: 100%; overflow-x: auto; }
+
+.appreciation-badge {
+  display: inline-block;
+  margin-bottom: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--primary-100);
+  color: var(--primary-700);
+}
+.appreciation-badge.level-CHAMPION { background: #FBE7AE; color: #7A5600; }
+.appreciation-badge.level-OVER { background: var(--warning-light); color: var(--warning-dark); }
+.appreciation-badge.level-NO_BUDGET { background: var(--bg-subtle); color: var(--text-secondary); }
+.appreciation-cta { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--primary-700); text-decoration: none; }
+.appreciation-cta:hover { text-decoration: underline; }
+@media (max-width: 640px) {
+  .appreciation-card { flex-direction: column; }
+}

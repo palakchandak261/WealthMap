@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   Plus, Target, AlertCircle, Pencil, CheckCircle,
-  AlertTriangle, TrendingUp, Trash2,
+  AlertTriangle, TrendingUp, Trash2, Upload,
 } from 'lucide-react';
 import api from '../../services/api';
+import ImportDataModal from '../../components/import/ImportDataModal';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 import { formatCurrency } from '../../utils/formatters';
 import type { Budget, CategoryBudget, ForecastResult } from '../../types';
@@ -40,6 +41,7 @@ const BudgetsPage: React.FC = () => {
   const [error, setError] = useState('');
   // Forecast data for utilization
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -154,7 +156,10 @@ const BudgetsPage: React.FC = () => {
             <h1>Budgets</h1>
             <p>Set and monitor your monthly spending limits</p>
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+              <Upload size={16} /> Import
+            </button>
             {budget && (
               <button className="btn btn-secondary" onClick={() => openCatModal()}>
                 <Plus size={16} /> Add Category
@@ -166,6 +171,8 @@ const BudgetsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ImportDataModal open={showImport} onClose={() => setShowImport(false)} onImported={() => fetchData()} defaultSection="budgets" />
 
       {error && !showBudgetModal && !showCatModal && <div className="alert-bar alert-bar-danger" role="alert" style={{ marginBottom: '1rem' }}><AlertCircle size={15} />{error}</div>}
 
